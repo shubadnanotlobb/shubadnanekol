@@ -325,6 +325,9 @@ function showPage(pageId, isBack = false) {
     backBtn.style.display = (pageId === "pageHome") ? "none" : "flex";
   }
 
+  // Homepage-only atmosphere (blue gradient + centred app-bar brand line)
+  document.body.classList.toggle("is-home", pageId === "pageHome");
+
   // Dynamic app-bar title — presentation only
   const titleEl = document.getElementById("headerTitleText");
   if (titleEl) {
@@ -766,6 +769,9 @@ function resetAdminForm() {
     adminMap.value = "";
 
 
+  setAdminRating(0);
+
+
   if (adminCoverFile)
     adminCoverFile.value = "";
 
@@ -1052,6 +1058,9 @@ async function saveRestaurantToFirebase() {
   const map =
     document.getElementById("adminMap")?.value.trim();
 
+  const rating =
+    getAdminRating();
+
 
   if (!name || !category) {
 
@@ -1240,6 +1249,8 @@ async function saveRestaurantToFirebase() {
         menu,
 
         map,
+
+        rating,
 
         coverStoragePath,
 
@@ -1460,6 +1471,8 @@ async function saveRestaurantToFirebase() {
 
       map,
 
+      rating,
+
       coverStoragePath: finalCoverStoragePath,
 
       logoStoragePath:
@@ -1575,6 +1588,45 @@ async function deleteRestaurantFromFirebase(id) {
 // ============================================================
 // ADMIN LOGIN
 // ============================================================
+
+/* The footer copyright is a hidden entry point: it now needs five
+   taps/clicks inside a short window, so nobody opens it by accident. */
+const FOOTER_TAP_TARGET = 5;
+const FOOTER_TAP_WINDOW = 1200; // ms allowed between two consecutive taps
+
+let footerTapCount = 0;
+let footerTapLastAt = 0;
+let footerTapResetTimer = null;
+
+function handleFooterTap(event) {
+  if (event && typeof event.preventDefault === "function") {
+    event.preventDefault();
+  }
+
+  const now = Date.now();
+
+  // A gap longer than the window restarts the sequence from scratch.
+  if (footerTapCount > 0 && now - footerTapLastAt > FOOTER_TAP_WINDOW) {
+    footerTapCount = 0;
+  }
+
+  footerTapLastAt = now;
+  footerTapCount += 1;
+
+  if (footerTapResetTimer) clearTimeout(footerTapResetTimer);
+  footerTapResetTimer = setTimeout(() => {
+    footerTapCount = 0;
+    footerTapResetTimer = null;
+  }, FOOTER_TAP_WINDOW);
+
+  if (footerTapCount >= FOOTER_TAP_TARGET) {
+    footerTapCount = 0;
+    footerTapLastAt = 0;
+    if (footerTapResetTimer) clearTimeout(footerTapResetTimer);
+    footerTapResetTimer = null;
+    checkAdminAccess();
+  }
+}
 
 function checkAdminAccess() {
 
@@ -1905,6 +1957,212 @@ function format12HourTime(timeStr) {
 
 
 // ============================================================
+// FAVORITES (localStorage only — no account, no Firebase)
+// ============================================================
+
+const FAVORITES_KEY = "shu_badna_nekol_favorites";
+
+function readFavorites() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(id => typeof id === "string" && id);
+  } catch (e) {
+    return [];
+  }
+}
+
+function isFavorite(id) {
+  if (!id) return false;
+  return readFavorites().indexOf(id) !== -1;
+}
+
+function toggleFavorite(id) {
+  if (!id) return false;
+
+  const list = readFavorites();
+  const index = list.indexOf(id);
+  let nowFavorite;
+
+  if (index === -1) {
+    list.push(id);
+    nowFavorite = true;
+  } else {
+    list.splice(index, 1);
+    nowFavorite = false;
+  }
+
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error("favorites storage:", e);
+  }
+
+  syncFavoriteUI(id);
+  return nowFavorite;
+}
+
+/* Keeps every rendered heart (cards + open profile) on the same state. */
+function syncFavoriteUI(id) {
+  const active = isFavorite(id);
+  const label = active
+    ? "إزالة المطعم من المفضلة"
+    : "أضف المطعم إلى المفضلة";
+
+  document.querySelectorAll(`[data-fav-id="${id}"]`).forEach(btn => {
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+    btn.setAttribute("aria-label", label);
+  });
+}
+
+function favoriteButtonHtml(id) {
+  if (!id) return "";
+  const active = isFavorite(id);
+  return `
+    <button
+      type="button"
+      class="fav-btn${active ? " is-active" : ""}"
+      data-fav-id="${id}"
+      aria-pressed="${active ? "true" : "false"}"
+      aria-label="${active ? "إزالة المطعم من المفضلة" : "أضف المطعم إلى المفضلة"}"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.7 10.6 19.4C5.4 14.7 2 11.6 2 7.9 2 5.1 4.2 3 7 3c1.6 0 3.1.7 4.1 1.9L12 5.4l.9-.5C13.9 3.7 15.4 3 17 3c2.8 0 5 2.1 5 4.9 0 3.7-3.4 6.8-8.6 11.5L12 20.7Z"/></svg>
+    </button>`;
+}
+
+/* A heart sits inside a clickable card, so it must swallow the card's
+   navigation — on pointer, on keyboard, and on bubbled key events. */
+function wireFavoriteButton(btn, getId) {
+  if (!btn) return;
+
+  btn.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavorite(getId());
+  });
+
+  btn.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleFavorite(getId());
+    }
+  });
+
+  ["pointerdown", "mousedown", "touchstart"].forEach(type => {
+    btn.addEventListener(type, event => event.stopPropagation());
+  });
+}
+
+// ============================================================
+// RATING (0–5, set by the admin — never invented by the UI)
+// ============================================================
+
+/* Returns a usable 0–5 number, or null when no rating is configured. */
+function normalizeRating(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!isFinite(n)) return null;
+  const rounded = Math.round(n * 10) / 10;
+  if (rounded <= 0 || rounded > 5) return null;
+  return rounded;
+}
+
+function ratingText(value) {
+  const n = normalizeRating(value);
+  if (n === null) return "";
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function ratingHtml(value, extraClass = "") {
+  const n = normalizeRating(value);
+  if (n === null) return ""; // no rating configured → show nothing
+
+  const percent = (n / 5) * 100;
+  const label = ratingText(n);
+
+  return `
+    <span class="rating ${extraClass}" role="img" aria-label="التقييم ${label} من 5">
+      <span class="rating-stars" aria-hidden="true">
+        <span class="rating-stars-track">★★★★★</span>
+        <span class="rating-stars-fill" style="width:${percent}%">★★★★★</span>
+      </span>
+      <span class="rating-value">${label}</span>
+    </span>`;
+}
+
+/* --- Admin 5-star picker ------------------------------------------------ */
+function getAdminRating() {
+  const input = document.getElementById("adminRating");
+  if (!input) return null;
+  const n = Number(input.value);
+  if (!isFinite(n) || n <= 0) return null;
+  return Math.min(5, Math.max(1, Math.round(n)));
+}
+
+function setAdminRating(value) {
+  const input = document.getElementById("adminRating");
+  const picker = document.getElementById("adminRatingPicker");
+  const meta = document.getElementById("adminRatingMeta");
+  if (!input || !picker) return;
+
+  const n = Number(value);
+  const clean = isFinite(n) && n > 0 ? Math.min(5, Math.max(1, Math.round(n))) : 0;
+
+  input.value = clean ? String(clean) : "";
+
+  picker.querySelectorAll(".star-picker-btn").forEach(btn => {
+    const v = Number(btn.dataset.value);
+    const on = v <= clean;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-checked", v === clean ? "true" : "false");
+  });
+
+  if (meta) {
+    meta.textContent = clean
+      ? `${clean} من 5`
+      : "بدون تقييم";
+  }
+}
+
+function setupRatingPicker() {
+  const picker = document.getElementById("adminRatingPicker");
+  if (!picker) return;
+
+  picker.addEventListener("click", event => {
+    const btn = event.target.closest(".star-picker-btn");
+    if (!btn) return;
+
+    const value = Number(btn.dataset.value);
+    const current = Number(document.getElementById("adminRating")?.value || 0);
+
+    // Tapping the current value clears the rating (0 = not configured).
+    setAdminRating(value === current ? 0 : value);
+  });
+
+  picker.addEventListener("keydown", event => {
+    const btn = event.target.closest(".star-picker-btn");
+    if (!btn) return;
+
+    const buttons = [...picker.querySelectorAll(".star-picker-btn")];
+    const index = buttons.indexOf(btn);
+    let next = -1;
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = index + 1;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = index - 1;
+
+    if (next >= 0 && next < buttons.length) {
+      event.preventDefault();
+      buttons[next].focus();
+      setAdminRating(Number(buttons[next].dataset.value));
+    }
+  });
+
+  setAdminRating(0);
+}
+
+// ============================================================
 // RENDER RESTAURANTS (PAGE 3) - مع التشقليب العشوائي
 // ============================================================
 
@@ -2011,11 +2269,17 @@ function renderRestaurantsList(
       ? `
         <div class="rc-media">
           <img class="rc-cover" src="${r.cover}" alt="" loading="lazy" decoding="async">
-          <img class="rc-logo" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+          <div class="rc-badge">
+            <img class="rc-logo" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+            <span class="rc-name">${r.name || ""}</span>
+          </div>
         </div>`
       : `
         <div class="rc-media is-brand">
-          <img class="rc-brand" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+          <div class="rc-badge">
+            <img class="rc-brand" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+            <span class="rc-name">${r.name || ""}</span>
+          </div>
         </div>`;
 
     let timeText = "";
@@ -2031,11 +2295,12 @@ function renderRestaurantsList(
     card.innerHTML = `
 
       ${mediaHtml}
+      ${favoriteButtonHtml(r.id)}
 
       <div class="rc-body">
         <div class="rc-head">
-          <h3 class="rc-name">${r.name || ""}</h3>
           <span class="status ${closed ? "is-closed" : "is-open"}"><i></i>${closed ? "مغلق" : "مفتوح"}</span>
+          ${ratingHtml(r.rating, "rating--sm")}
         </div>
 
         <p class="rc-desc">${r.desc || ""}</p>
@@ -2048,6 +2313,8 @@ function renderRestaurantsList(
 
     `;
 
+
+    wireFavoriteButton(card.querySelector(".fav-btn"), () => r.id);
 
     container.appendChild(card);
 
@@ -2112,6 +2379,22 @@ function fillRestaurantProfileDOM(r) {
     const statusText = statusEl.querySelector(".status-text");
     if (statusText) statusText.textContent = statusLabel;
     statusEl.hidden = false;
+  }
+
+  /* --- Rating chip (only when the admin configured one) --- */
+  const ratingEl = document.getElementById("profileRating");
+  if (ratingEl) {
+    const ratingMarkup = ratingHtml(r.rating);
+    ratingEl.innerHTML = ratingMarkup || "";
+    ratingEl.hidden = !ratingMarkup;
+  }
+
+  /* --- Favorite toggle (localStorage) --- */
+  const favBtn = document.getElementById("profileFavBtn");
+  if (favBtn) {
+    favBtn.dataset.favId = r.id || "";
+    favBtn.onclick = () => toggleFavorite(r.id);
+    syncFavoriteUI(r.id);
   }
 
   /* --- Actions --- */
@@ -2456,6 +2739,7 @@ function listenToRestaurants() {
                 phone: data.phone || "",
                 menu: data.menu || "",
                 map: data.map || "",
+                rating: data.rating ?? "",
                 coverStoragePath: data.coverStoragePath || "",
                 logoStoragePath: data.logoStoragePath || "",
                 galleryStoragePaths: data.galleryStoragePaths || []
@@ -2695,6 +2979,11 @@ function editRestaurant(
 
     adminMap.value =
       restaurant.map || "";
+
+
+  setAdminRating(
+    restaurant.rating
+  );
 
 
   const formTitle =
@@ -3084,6 +3373,8 @@ window.deferredPrompt = window.deferredPrompt || null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   window.deferredPrompt = e;
+  // Only Chrome fires this again after the app was removed from the device.
+  if (isPwaInstalled()) showPwaInstallSection();
 });
 
 function isStandaloneMode() {
@@ -3091,20 +3382,42 @@ function isStandaloneMode() {
          window.navigator.standalone === true;
 }
 
-function hidePwaInstallButtons() {
-  document.querySelectorAll('.pwa-download-container').forEach((el) => {
+function isPwaInstalled() {
+  try {
+    return localStorage.getItem(window.PWA_INSTALLED_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+// Hides the whole "ثبّت التطبيق على شاشتك" block (title + both buttons).
+function hidePwaInstallButtons(persist) {
+  document.querySelectorAll('.pwa-download-container, #installSection').forEach((el) => {
     el.style.display = 'none';
   });
   const modal = document.getElementById('pwaModal');
   if (modal) modal.style.display = 'none';
+  if (persist) {
+    try { localStorage.setItem(window.PWA_INSTALLED_KEY, '1'); } catch (e) {}
+  }
+}
+
+function showPwaInstallSection() {
+  try { localStorage.removeItem(window.PWA_INSTALLED_KEY); } catch (e) {}
+  const section = document.getElementById('installSection');
+  if (section) section.style.display = '';
+  document.querySelectorAll('.pwa-download-container').forEach((el) => {
+    el.style.display = '';
+  });
 }
 
 window.hidePwaInstallButtons = hidePwaInstallButtons;
+window.showPwaInstallSection = showPwaInstallSection;
 
 window.triggerInstallModal = function() {
   // لا تعرض أي شيء داخل التطبيق المثبت
   if (isStandaloneMode()) {
-    hidePwaInstallButtons();
+    hidePwaInstallButtons(true);
     return;
   }
   const modal = document.getElementById('pwaModal');
@@ -3134,7 +3447,7 @@ async function promptAndroidInstall() {
     const { outcome } = await window.deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       console.log('User accepted the install prompt');
-      hidePwaInstallButtons();
+      hidePwaInstallButtons(true);
     }
   } catch (err) {
     console.error('Install prompt failed:', err);
@@ -3148,13 +3461,18 @@ window.promptAndroidInstall = promptAndroidInstall;
 
 window.addEventListener('appinstalled', () => {
   window.deferredPrompt = null;
-  hidePwaInstallButtons();
+  hidePwaInstallButtons(true);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  // إخفاء زري التثبيت (أندرويد + آيفون) إذا فُتح الموقع كتطبيق standalone
+  // إخفاء بلوك التثبيت كاملاً إذا فُتح الموقع كتطبيق مثبّت
+  // أو إذا كان التثبيت مسجّلاً مسبقاً من زيارة سابقة
   if (isStandaloneMode()) {
-    hidePwaInstallButtons();
+    hidePwaInstallButtons(true);
+    return;
+  }
+  if (isPwaInstalled()) {
+    hidePwaInstallButtons(false);
     return;
   }
 
@@ -3217,6 +3535,18 @@ window.deleteRestaurantFromFirebase =
 
 window.checkAdminAccess =
   checkAdminAccess;
+
+window.handleFooterTap =
+  handleFooterTap;
+
+window.toggleFavorite =
+  toggleFavorite;
+
+window.isFavorite =
+  isFavorite;
+
+window.ratingHtml =
+  ratingHtml;
 
 window.performAdminLogin =
   performAdminLogin;
@@ -3283,6 +3613,7 @@ function wireSearchField(inputId) {
 function initDesignSystem() {
   wireSearchField("categoriesSearchInput");
   wireSearchField("restaurantsSearchInput");
+  setupRatingPicker();
 
   /* --- Lightbox controls --- */
   const lightbox = document.getElementById("lightbox");

@@ -33,6 +33,11 @@
   --accent-dim: rgba(25, 169, 157, 0.14);
   --accent-line: rgba(25, 169, 157, 0.38);
 
+  /* Cyan highlight ring used by the brand + restaurant logo badges */
+  --glow: #35c9ff;
+  --glow-ring: rgba(140, 226, 255, 0.95);
+  --glow-halo: rgba(53, 201, 255, 0.5);
+
   /* Semantic */
   --open: #3fbf7f;
   --open-dim: rgba(63, 191, 127, 0.14);
@@ -486,6 +491,111 @@ p {
   color: var(--closed);
 }
 
+/* --- Rating (sits beside the status chip, never on its own) ------------- */
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rating-stars {
+  position: relative;
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  line-height: 1;
+}
+
+.rating-stars-track {
+  color: rgba(255, 255, 255, 0.16);
+}
+
+.rating-stars-fill {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  overflow: hidden;
+  color: #f0b429;
+  letter-spacing: 1.5px;
+  pointer-events: none;
+}
+
+.rating-value {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.rating--sm .rating-stars {
+  font-size: 12px;
+}
+
+.rating--sm .rating-value {
+  font-size: 11px;
+}
+
+/* --- Favourite (heart) -------------------------------------------------- */
+.fav-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-2);
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+
+.fav-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+  transition: fill var(--dur) var(--ease), transform var(--dur-2) var(--ease);
+}
+
+.fav-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fav-btn:active {
+  transform: scale(0.9);
+}
+
+.fav-btn.is-active {
+  color: #ff6b81;
+}
+
+.fav-btn.is-active svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+/* On top of card artwork: a soft scrim keeps it legible without
+   covering the name, status or rating below. */
+.restaurant-card > .fav-btn {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  z-index: 3;
+  background: rgba(5, 9, 8, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #fff;
+}
+
+.restaurant-card > .fav-btn.is-active {
+  color: #ff6b81;
+}
+
 /* --------------------------------------------------------------------------
    7. FIELDS / SEARCH
    -------------------------------------------------------------------------- */
@@ -559,6 +669,50 @@ textarea.field-control {
   .field-row {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* --- Admin star picker -------------------------------------------------- */
+.star-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  width: fit-content;
+}
+
+.star-picker-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  font-size: 24px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.18);
+  transition: color var(--dur) var(--ease), transform var(--dur-2) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.star-picker-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.star-picker-btn.is-on {
+  color: #f0b429;
+}
+
+.star-picker-btn:active {
+  transform: scale(0.88);
+}
+
+.star-picker-meta {
+  font-size: var(--t-2xs);
+  color: var(--text-3);
+  margin-top: 6px;
 }
 
 /* --- Search ------------------------------------------------------------- */
@@ -735,23 +889,57 @@ textarea.field-control {
 /* --------------------------------------------------------------------------
    10. HOME
    -------------------------------------------------------------------------- */
+/* --- Homepage atmosphere -------------------------------------------------
+   Lit navy base with soft neon blooms (cyan / teal / indigo). Home only
+   (body.is-home), so the rest of the app keeps the flat near-black surface. */
+body.is-home {
+  background-color: #060a14;
+  background-image:
+    radial-gradient(130% 55% at 50% -12%, rgba(64, 196, 255, 0.3) 0%, rgba(64, 196, 255, 0) 62%),
+    radial-gradient(100% 45% at 88% 22%, rgba(25, 169, 157, 0.2) 0%, rgba(25, 169, 157, 0) 66%),
+    radial-gradient(90% 40% at 8% 30%, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 60%),
+    linear-gradient(180deg, #0e2350 0%, #0c1c42 20%, #091430 45%, #060d1e 72%, #04070f 100%);
+  background-attachment: fixed;
+}
+
+body.is-home .appbar {
+  background: rgba(7, 13, 28, 0.78);
+}
+
+/* App-bar brand line is centred while the home page is on screen */
+body.is-home .appbar-inner {
+  justify-content: center;
+}
+
+body.is-home .appbar-spacer {
+  display: none;
+}
+
+body.is-home .appbar-title {
+  flex: 1;
+  text-align: center;
+}
+
 .masthead {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
-  padding-bottom: var(--sp-5);
-  margin-bottom: var(--sp-5);
+  text-align: center;
+  gap: var(--sp-4);
+  padding-block: var(--sp-8) var(--sp-7);
+  margin-bottom: var(--sp-6);
   border-bottom: 1px solid var(--line);
 }
 
 .masthead-logo {
-  width: 54px;
-  height: 54px;
+  width: 76px;
+  height: 76px;
   flex: 0 0 auto;
-  border-radius: 14px;
+  border-radius: 22px;
   overflow: hidden;
   background: #000;
-  border: 1px solid var(--line-strong);
+  border: 2px solid var(--glow-ring);
+  box-shadow: 0 0 0 3px rgba(4, 10, 18, 0.65), 0 0 22px 5px var(--glow-halo);
 }
 
 .masthead-logo img {
@@ -763,25 +951,26 @@ textarea.field-control {
 
 .masthead-copy {
   min-width: 0;
+  max-width: 40ch;
 }
 
 .wordmark {
-  font-size: 17px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: 0.055em;
+  letter-spacing: 0.14em;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .wordmark span {
-  color: var(--accent);
+  color: var(--accent-2);
 }
 
 .masthead-tagline {
-  font-size: var(--t-xs);
-  color: var(--text-3);
-  margin-top: 3px;
-  line-height: 1.5;
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  margin-top: 10px;
+  line-height: 1.6;
 }
 
 /* --- Hero ---------------------------------------------------------------- */
@@ -1186,17 +1375,50 @@ textarea.field-control {
   opacity: 0.95;
 }
 
-.rc-logo {
+/* Logo + name lockup, centred on the cover */
+.rc-badge {
   position: absolute;
-  inset-inline-start: 14px;
-  bottom: 14px;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  inset-inline: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-inline: var(--sp-3);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.rc-badge .rc-name {
+  flex: none;
+  max-width: 100%;
+  text-align: center;
+  font-size: var(--t-h3);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: rgba(4, 8, 12, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.rc-logo {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  border-radius: 50%;
   object-fit: cover;
   background: #0a0d0c;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  z-index: 2;
+  border: 2px solid var(--glow-ring);
+  box-shadow: 0 0 0 3px rgba(4, 10, 18, 0.6), 0 0 18px 4px var(--glow-halo);
 }
 
 .rc-media::after {
@@ -1227,19 +1449,9 @@ textarea.field-control {
 .rc-head {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  flex-wrap: wrap;
+  gap: 6px var(--sp-3);
   margin-bottom: 5px;
-}
-
-.rc-name {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--t-h3);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .rc-desc {
@@ -1312,10 +1524,20 @@ textarea.field-control {
 .profile-logo {
   width: 72px;
   height: 72px;
-  border-radius: var(--r-md);
-  object-fit: cover;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
+}
+
+/* Logos often ship with white padding around the artwork — the zoom
+   crops it so the badge reads as a full circle. */
+.profile-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.3);
 }
 
 .profile-title {
@@ -1338,8 +1560,26 @@ textarea.field-control {
   min-width: 0;
 }
 
-.profile-identity .status {
+.profile-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+.profile-badges .fav-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.profile-badges .fav-btn:hover {
+  background: var(--surface-3);
+}
+
+.profile-rating {
+  display: inline-flex;
+  align-items: center;
 }
 
 .profile-gallery {

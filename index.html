@@ -25,14 +25,7 @@
 
     <script>
   window.deferredPrompt = null;
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    window.deferredPrompt = e;
-  });
-  window.addEventListener('appinstalled', () => {
-    window.deferredPrompt = null;
-    hidePwaInstallButtons();
-  });
+  window.PWA_INSTALLED_KEY = 'shu_badna_nekol_pwa_installed';
 
   function isStandaloneMode() {
     return window.matchMedia('(display-mode: standalone)').matches ||
@@ -40,17 +33,64 @@
            new URLSearchParams(window.location.search).get('standalone') === 'true';
   }
 
-  function hidePwaInstallButtons() {
-    document.querySelectorAll('.pwa-download-container').forEach((el) => {
+  function isPwaInstalled() {
+    try {
+      return localStorage.getItem(window.PWA_INSTALLED_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Hides the whole "ثبّت التطبيق على شاشتك" block (title + both buttons).
+  // persist = true when the app is genuinely installed, so the block stays
+  // gone on the next visit too.
+  function hidePwaInstallButtons(persist) {
+    document.querySelectorAll('.pwa-download-container, #installSection').forEach((el) => {
       el.style.display = 'none';
     });
     const modal = document.getElementById('pwaModal');
     if (modal) modal.style.display = 'none';
+    if (persist) {
+      try { localStorage.setItem(window.PWA_INSTALLED_KEY, '1'); } catch (e) {}
+    }
   }
 
-  if (isStandaloneMode()) {
-    document.addEventListener('DOMContentLoaded', hidePwaInstallButtons, { once: true });
+  function showPwaInstallSection() {
+    try { localStorage.removeItem(window.PWA_INSTALLED_KEY); } catch (e) {}
+    const section = document.getElementById('installSection');
+    if (section) section.style.display = '';
+    document.querySelectorAll('.pwa-download-container').forEach((el) => {
+      el.style.display = '';
+    });
   }
+
+  window.isPwaInstalled = isPwaInstalled;
+  window.isStandaloneMode = isStandaloneMode;
+  window.hidePwaInstallButtons = hidePwaInstallButtons;
+  window.showPwaInstallSection = showPwaInstallSection;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window.deferredPrompt = e;
+    // The browser only re-offers installation once the app is no longer on
+    // the device — that is our (best-effort) "user removed it" signal.
+    if (isPwaInstalled()) showPwaInstallSection();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    window.deferredPrompt = null;
+    hidePwaInstallButtons(true);
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Already installed (Chrome/Android sets the flag via `appinstalled`,
+    // iOS only reports it when the site is opened as a standalone app).
+    if (isStandaloneMode()) {
+      hidePwaInstallButtons(true);
+    } else if (isPwaInstalled()) {
+      hidePwaInstallButtons(false);
+    }
+  });
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -71,7 +111,7 @@
   }
     </script>
 </head>
-<body>
+<body class="is-home">
 
 <!-- ============================ APP BAR ============================ -->
 <header class="appbar">
@@ -117,17 +157,6 @@
 
             <div class="home-side">
                 <nav class="quicklinks" aria-label="روابط سريعة">
-                    <button type="button" class="quicklink" onclick="window.openCategories && window.openCategories()">
-                        <span class="quicklink-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/>
-                                <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>
-                            </svg>
-                        </span>
-                        <span class="quicklink-label">تصفّح الأقسام</span>
-                        <svg class="quicklink-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-                    </button>
-
                     <a class="quicklink is-wa" href="https://wa.me/96170725668" target="_blank" rel="noopener noreferrer">
                         <span class="quicklink-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -145,7 +174,7 @@
             </div>
         </div>
 
-        <section class="install">
+        <section class="install" id="installSection">
             <div class="install-title">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
                 ثبّت التطبيق على شاشتك
@@ -213,9 +242,17 @@
         </div>
 
         <div class="profile-head">
-            <img id="profileLogo" class="profile-logo" alt="">
+            <div class="profile-logo">
+                <img id="profileLogo" alt="">
+            </div>
             <div class="profile-identity">
-                <span class="status is-open" id="profileStatus" hidden><i></i><span class="status-text"></span></span>
+                <div class="profile-badges">
+                    <span class="status is-open" id="profileStatus" hidden><i></i><span class="status-text"></span></span>
+                    <span class="profile-rating" id="profileRating" hidden></span>
+                    <button class="fav-btn" id="profileFavBtn" type="button" aria-pressed="false" aria-label="أضف المطعم إلى المفضلة">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.7 10.6 19.4C5.4 14.7 2 11.6 2 7.9 2 5.1 4.2 3 7 3c1.6 0 3.1.7 4.1 1.9L12 5.4l.9-.5C13.9 3.7 15.4 3 17 3c2.8 0 5 2.1 5 4.9 0 3.7-3.4 6.8-8.6 11.5L12 20.7Z"/></svg>
+                    </button>
+                </div>
                 <h1 class="profile-title" id="profileName">اسم المطعم</h1>
                 <p class="profile-desc" id="profileDesc">وصف المطعم</p>
             </div>
@@ -357,6 +394,19 @@
                     </div>
 
                     <div class="field admin-form-group">
+                        <span class="field-label" id="adminRatingLabel">التقييم (من 5)</span>
+                        <input type="hidden" id="adminRating" value="">
+                        <div class="star-picker" id="adminRatingPicker" role="radiogroup" aria-labelledby="adminRatingLabel">
+                            <button type="button" class="star-picker-btn" data-value="1" aria-label="نجمة واحدة" aria-checked="false" role="radio">★</button>
+                            <button type="button" class="star-picker-btn" data-value="2" aria-label="نجمتان" aria-checked="false" role="radio">★</button>
+                            <button type="button" class="star-picker-btn" data-value="3" aria-label="ثلاث نجوم" aria-checked="false" role="radio">★</button>
+                            <button type="button" class="star-picker-btn" data-value="4" aria-label="أربع نجوم" aria-checked="false" role="radio">★</button>
+                            <button type="button" class="star-picker-btn" data-value="5" aria-label="خمس نجوم" aria-checked="false" role="radio">★</button>
+                        </div>
+                        <div class="star-picker-meta" id="adminRatingMeta">بدون تقييم</div>
+                    </div>
+
+                    <div class="field admin-form-group">
                         <label class="field-label" for="adminCoverFile">صورة الخلفية (الغلاف)</label>
                         <input type="file" id="adminCoverFile" accept="image/*">
                         <div class="upload-help-text">اختر صورة الخلفية الكبيرة للمطعم من جهازك</div>
@@ -419,7 +469,7 @@
 <!-- ============================ FOOTER ============================ -->
 <footer class="appfoot">
     <div class="appfoot-inner shell">
-        <a href="javascript:void(0);" onclick="window.checkAdminAccess && window.checkAdminAccess()" class="appfoot-link">
+        <a href="javascript:void(0);" onclick="window.handleFooterTap && window.handleFooterTap(event)" class="appfoot-link">
             SHU BADNA NEKOL 2026 © جميع الحقوق محفوظة
         </a>
     </div>
