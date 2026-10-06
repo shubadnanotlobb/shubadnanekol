@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* preview-only section labels */
+  .pv-label { font-size: 12px; font-weight:600; color:#5f6a67; letter-spacing:.08em; text-transform:uppercase; margin: 32px 0 12px; }
+  .pv-label:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+<header class="appbar"><div class="appbar-inner shell"><div class="appbar-title">معاينة المكوّنات</div><div class="appbar-spacer"></div></div></header>
+<main class="main shell">
+
+  <div class="pv-label">Category cards</div>
+  <div class="categories-grid">
+    <div class="category-card">
+      <div class="cat-media"><img src="iconnn.jpeg" alt="سناك ومأكولات سريعة" loading="lazy"></div>
+      <div class="cat-body"><span class="cat-name">سناك ومأكولات سريعة</span><svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="cat-en">Snack &amp; Fast Food</div>
+    </div>
+    <div class="category-card">
+      <div class="cat-media"><img src="1789188520770%281%29.png" alt="برجر" loading="lazy"></div>
+      <div class="cat-body"><span class="cat-name">برجر وشاورما</span><svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="cat-en">Burgers</div>
+    </div>
+    <div class="category-card">
+      <div class="cat-media"><img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33.jpeg" alt="بيتزا" loading="lazy"></div>
+      <div class="cat-body"><span class="cat-name">بيتزا</span><svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    </div>
+    <div class="category-card">
+      <div class="cat-media"><img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%281%29.jpeg" alt="صحن طويل إسم" loading="lazy"></div>
+      <div class="cat-body"><span class="cat-name">صحن طويل جداً للاختبار</span><svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="cat-en">Very Long English Category Name</div>
+    </div>
+  </div>
+
+  <div class="pv-label">Skeleton + empty state</div>
+  <div class="categories-grid">
+    <div class="skel skel-cat"></div><div class="skel skel-cat"></div><div class="skel skel-cat"></div><div class="skel skel-cat"></div>
+  </div>
+  <div class="categories-grid" style="margin-top:16px">
+    <div class="empty">
+      <div class="empty-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/></svg></div>
+      <div class="empty-title">لا توجد نتائج</div>
+      <div class="empty-text">ما لقينا قسم بهذا الاسم. جرّب كلمة تانية.</div>
+    </div>
+  </div>
+
+  <div class="pv-label">Restaurant cards</div>
+  <div class="restaurants-grid">
+
+    <div class="restaurant-card is-open">
+      <div class="rc-media">
+        <img class="rc-cover" src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%282%29.jpeg" alt="" loading="lazy">
+        <img class="rc-logo" src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%283%29.jpeg" alt="" loading="lazy">
+      </div>
+      <div class="rc-body">
+        <div class="rc-head">
+          <h3 class="rc-name">Gorella Food Truck</h3>
+          <span class="status is-open"><i></i>مفتوح</span>
+        </div>
+        <p class="rc-desc">Best Burgers in Town — أطيب برغر بالضاحية مع خبز طازج يومياً.</p>
+        <div class="rc-meta"><span class="rc-meta-time">يغلق 2:00 AM</span><svg class="rc-meta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      </div>
+    </div>
+
+    <div class="restaurant-card is-closed">
+      <div class="rc-media">
+        <img class="rc-cover" src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%284%29.jpeg" alt="" loading="lazy">
+        <img class="rc-logo" src="9e460dbd-cee2-4bb4-80ba-506e306bfb9c.jpg" alt="" loading="lazy">
+      </div>
+      <div class="rc-body">
+        <div class="rc-head">
+          <h3 class="rc-name">مطعم بيت الصاج</h3>
+          <span class="status is-closed"><i></i>مغلق</span>
+        </div>
+        <p class="rc-desc">مشاوي ومشاوي على الفحم.</p>
+        <div class="rc-meta"><span class="rc-meta-time">يفتح اليوم 11:00 AM</span><svg class="rc-meta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      </div>
+    </div>
+
+    <div class="restaurant-card is-open">
+      <div class="rc-media is-brand">
+        <img class="rc-brand" src="iconnn.jpeg" alt="" loading="lazy">
+      </div>
+      <div class="rc-body">
+        <div class="rc-head">
+          <h3 class="rc-name">Salad Bar</h3>
+          <span class="status is-open"><i></i>مفتوح</span>
+        </div>
+        <p class="rc-desc"></p>
+        <div class="rc-meta"><span class="rc-meta-time">مفتوح الآن</span><svg class="rc-meta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      </div>
+    </div>
+
+    <div class="restaurant-card is-open">
+      <div class="rc-media">
+        <img class="rc-cover" src="1789188520770%281%29.png" alt="" loading="lazy">
+        <img class="rc-logo" src="WhatsApp%20Image%202026-09-28%20at%2020.57.33.jpeg" alt="" loading="lazy">
+      </div>
+      <div class="rc-body">
+        <div class="rc-head">
+          <h3 class="rc-name">A restaurant with a very long name for ellipsis testing</h3>
+          <span class="status is-open"><i></i>مفتوح</span>
+        </div>
+        <p class="rc-desc">وصف قصير.</p>
+        <div class="rc-meta"><span class="rc-meta-time">يغلق 11:30 PM</span><svg class="rc-meta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pv-label">Restaurant list skeleton</div>
+  <div class="restaurants-grid">
+    <div class="skel skel-rc"></div><div class="skel skel-rc"></div>
+  </div>
+
+  <div class="pv-label">Profile (populated)</div>
+  <div class="profile-cover">
+    <img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%281%29.jpeg" alt="">
+  </div>
+  <div class="profile-head">
+    <img class="profile-logo" src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%282%29.jpeg" alt="">
+    <div class="profile-identity">
+      <span class="status is-open"><i></i><span class="status-text">مفتوح الآن · يغلق 2:00 AM</span></span>
+      <h1 class="profile-title">Gorella Food Truck</h1>
+      <p class="profile-desc">Best Burgers in Town — أطيب برغر بالضاحية، خبز طازج يومياً وصوصات خاصة.</p>
+    </div>
+  </div>
+  <div class="profile-layout">
+    <div class="profile-cta">
+      <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-wa btn-lg btn-block">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.03 0C5.4 0 .01 5.39.01 12.02c0 2.12.55 4.19 1.6 6.013L0 24l6.147-1.612a11.97 11.97 0 005.884 1.533h.005c6.64 0 12.02-5.39 12.02-12.02C24.06 5.39 18.66 0 12.03 0zm0 22.028h-.004c-1.8 0-3.564-.484-5.112-1.403l-.367-.218-3.799.996 1.014-3.702-.24-.381A9.972 9.972 0 012.036 12.03c0-5.511 4.484-9.995 9.995-9.995 5.511 0 9.995 4.484 9.995 9.995 0 5.511-4.484 10.02-9.995 10.02z"/></svg>
+        تواصل عبر واتساب
+      </a>
+      <div class="profile-cta-row">
+        <a href="#" target="_blank" rel="noopener" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9.5 13h5M9.5 17h5"/></svg>
+          المنيو
+        </a>
+        <a href="#" target="_blank" rel="noopener" class="btn btn-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          الموقع
+        </a>
+      </div>
+    </div>
+    <div class="profile-gallery">
+      <div class="section-head"><h2 class="section-title">معرض الصور</h2><span class="section-sub">اضغط للتكبير</span></div>
+      <div class="gallery-grid">
+        <button class="gallery-item"><img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%283%29.jpeg" alt=""></button>
+        <button class="gallery-item"><img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33%20%284%29.jpeg" alt=""></button>
+        <button class="gallery-item"><img src="9e460dbd-cee2-4bb4-80ba-506e306bfb9c.jpg" alt=""></button>
+        <button class="gallery-item"><img src="iconnn.jpeg" alt=""></button>
+        <button class="gallery-item"><img src="1789188520770%281%29.png" alt=""></button>
+        <button class="gallery-item"><img src="WhatsApp%20Image%202026-09-28%20at%2020.57.33.jpeg" alt=""></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pv-label">Admin rows</div>
+  <section class="panel">
+    <div class="panel-head"><h3 class="panel-title">إضافة / تعديل قسم</h3></div>
+    <div class="admin-list">
+      <div class="admin-row">
+        <div class="admin-row-main"><span class="admin-row-title">سناك ومأكولات سريعة</span><span class="admin-row-sub">#1 · Snack &amp; Fast Food</span></div>
+        <div class="admin-row-actions">
+          <button class="btn btn-sm btn-ghost" type="button">تعديل</button>
+          <button class="btn btn-sm btn-danger" type="button">حذف</button>
+        </div>
+      </div>
+      <div class="admin-row">
+        <div class="admin-row-main"><span class="admin-row-title">مطاعم ومشاوي</span><span class="admin-row-sub">#2 · Grills</span></div>
+        <div class="admin-row-actions">
+          <button class="btn btn-sm btn-ghost" type="button">تعديل</button>
+          <button class="btn btn-sm btn-danger" type="button">حذف</button>
+        </div>
+      </div>
+      <div class="admin-row">
+        <div class="admin-row-main"><span class="admin-row-title">Gorella Food Truck</span><span class="admin-row-sub">سناك ومأكولات سريعة · 11:00 – 02:00</span></div>
+        <div class="admin-row-actions">
+          <button class="btn btn-sm btn-ghost" type="button">تعديل</button>
+          <button class="btn btn-sm btn-danger" type="button">حذف</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="pv-label">Fields</div>
+  <section class="panel">
+    <div class="field admin-form-group">
+      <label class="field-label" for="pv1">اسم المطعم</label>
+      <input class="field-control" id="pv1" type="text" placeholder="e.g. Gorella Food Truck">
+    </div>
+    <div class="field admin-form-group">
+      <label class="field-label" for="pv2">القسم</label>
+      <select class="field-control" id="pv2"><option>اختر القسم...</option><option>برجر</option></select>
+    </div>
+    <div class="field-row">
+      <div class="field admin-form-group">
+        <label class="field-label" for="pv3">ساعة الفتح</label>
+        <input class="field-control" id="pv3" type="time" value="11:00">
+      </div>
+      <div class="field admin-form-group">
+        <label class="field-label" for="pv4">ساعة الإغلاق</label>
+        <input class="field-control" id="pv4" type="time" value="02:00">
+      </div>
+    </div>
+    <div class="field admin-form-group">
+      <label class="field-label" for="pv5">صورة الخلفية</label>
+      <input type="file" id="pv5" accept="image/*">
+      <div class="upload-help-text">اختر صورة الخلفية الكبيرة للمطعم من جهازك</div>
+      <input class="field-control field-control--follow" id="pv6" type="text" placeholder="أو ضع رابط صورة الخلفية مباشرة">
+    </div>
+    <div class="admin-actions">
+      <button class="btn btn-primary" type="button">حفظ المطعم</button>
+      <button class="btn btn-quiet" type="button">إعادة تعيين</button>
+    </div>
+  </section>
+
+  <div class="pv-label">Search + buttons</div>
+  <div class="search-field has-value">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/></svg>
+    <input type="text" class="search-input" placeholder="ابحث عن قسم معين..." value="برجر">
+    <button type="button" class="search-clear" aria-label="مسح"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="btn-row" style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-primary">Primary</button>
+    <button class="btn btn-wa">WhatsApp</button>
+    <button class="btn btn-ghost">Ghost</button>
+    <button class="btn btn-quiet">Quiet</button>
+    <button class="btn btn-danger">Danger</button>
+    <button class="btn btn-primary btn-sm">Small</button>
+    <button class="btn btn-primary" disabled>Disabled</button>
+  </div>
+
+</main>
+<footer class="appfoot"><div class="appfoot-inner shell"><a href="#" class="appfoot-link">SHU BADNA NEKOL 2026 © جميع الحقوق محفوظة</a></div></footer>
+<a href="#" class="floating-whatsapp" aria-label="واتساب"><svg viewBox="0 0 24 24"><path d="M12.031 0C5.39 0 0 5.39 0 12.031c0 2.122.553 4.195 1.607 6.013L0 24l6.147-1.612a11.97 11.97 0 005.884 1.533h.005c6.64 0 12.03-5.39 12.03-12.031C24.066 5.39 18.671 0 12.031 0zm0 22.028h-.004c-1.8 0-3.564-.484-5.112-1.403l-.367-.218-3.799.996 1.014-3.702-.24-.381A9.972 9.972 0 012.036 12.03c0-5.511 4.484-9.995 9.995-9.995 5.511 0 9.995 4.484 9.995 9.995 0 5.511-4.484 10.02-9.995 9.998z"/></svg></a>
+</body>
+</html>

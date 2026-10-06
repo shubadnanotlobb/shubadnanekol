@@ -1,213 +1,29 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <!-- إعدادات خاصة لأجهزة آيفون (Apple iOS) -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <title>Shu Badna Nekol - شو بدنا ناكل</title>
+    <meta name="description" content="شو بدنا ناكل — دليلك الأول للمطاعم التي تستحق التجربة في منطقة الضاحية.">
+    <meta name="theme-color" content="#0a0d0c">
+
+    <!-- PWA / iOS -->
     <link rel="apple-touch-icon" href="iconnn.jpeg">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="شو بدنا ناكل">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Shu Badna Nekol - شو بدنا ناكل</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        .view-page { display: none; }
-        .view-page.active { display: block !important; }
-        .region-card-link { display: block; text-decoration: none; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .footer-link { display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; padding: 15px 0; -webkit-tap-highlight-color: transparent; }
-
-        /* Firebase image upload */
-        .image-upload-preview {
-            display: none;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 12px;
-            margin-top: 8px;
-            border: 2px solid #008080;
-        }
-
-        .gallery-upload-preview {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            margin-top: 8px;
-        }
-
-        .gallery-upload-preview img {
-            width: 100%;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-
-        .upload-help-text {
-            font-size: 10px;
-            color: #777;
-            margin-top: 4px;
-        }
-
-        .clickable-pill {
-            cursor: pointer;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* تنسيقات نافذة شرح الآيفون المُحدثة (صور أكبر وواضحة بدون كوادور مزعجة) */
-        .ios-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 999999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(6px);
-            padding: 10px;
-        }
-        .ios-modal-content {
-            background: #161b22;
-            border: 1px solid rgba(0, 242, 254, 0.35);
-            border-radius: 24px;
-            width: 100%;
-            max-width: 440px;
-            max-height: 92vh;
-            display: flex;
-            flex-direction: column;
-            padding: 20px 15px;
-            position: relative;
-            color: #fff;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-        }
-        .ios-close-btn {
-            position: absolute;
-            top: 12px;
-            left: 15px;
-            background: none;
-            border: none;
-            color: #8b949e;
-            font-size: 26px;
-            cursor: pointer;
-        }
-        .ios-modal-content h3 {
-            text-align: center;
-            font-size: 16px;
-            margin-bottom: 15px;
-            color: #00f2fe;
-            font-weight: 700;
-        }
-        .ios-steps-scroll {
-            overflow-y: auto;
-            flex: 1;
-            padding: 0 5px;
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-        }
-        .ios-step-card {
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 14px;
-            padding: 10px 0;
-            text-align: center;
-        }
-        .ios-step-card p {
-            font-size: 13px;
-            color: #f0f6fc;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        .ios-step-card img {
-            width: 100%;
-            max-height: 350px;
-            object-fit: contain;
-            border-radius: 12px;
-            border: none;
-            background: transparent;
-        }
-        .ios-done-btn {
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            color: #000;
-            border: none;
-            padding: 13px;
-            border-radius: 12px;
-            font-weight: 800;
-            width: 100%;
-            cursor: pointer;
-            margin-top: 15px;
-            font-size: 14px;
-        }
-        /* نافذة تثبيت أندرويد */
-        .pwa-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 999999;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(6px);
-            padding: 15px;
-        }
-        .pwa-modal-content {
-            background: #161b22;
-            border: 1px solid rgba(0, 242, 254, 0.35);
-            border-radius: 24px;
-            width: 100%;
-            max-width: 380px;
-            padding: 22px 18px;
-            text-align: center;
-            color: #fff;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-        }
-        .pwa-modal-content h3 {
-            font-size: 16px;
-            margin-bottom: 8px;
-            color: #00f2fe;
-            font-weight: 800;
-        }
-        .pwa-modal-content p {
-            font-size: 13px;
-            color: #c9d1d9;
-            margin-bottom: 16px;
-            line-height: 1.7;
-        }
-        .pwa-modal-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .pwa-install-confirm {
-            flex: 1;
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            color: #000;
-            border: none;
-            padding: 12px;
-            border-radius: 12px;
-            font-weight: 800;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .pwa-install-cancel {
-            flex: 1;
-            background: transparent;
-            color: #8b949e;
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 12px;
-            border-radius: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            font-size: 14px;
-        }
-    </style>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#00f2fe">
-   <script>
+
+    <!-- Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="style.css">
+
+    <script>
   window.deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -253,330 +69,446 @@
       const modal = document.getElementById('iosGuideModal');
       if (modal) modal.style.display = 'none';
   }
-</script>
+    </script>
 </head>
-<body style="padding-bottom: 80px;">
+<body>
 
-<div class="app-container">
-    <header class="app-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <button class="back-btn" id="backBtn" onclick="window.goBack()" aria-label="Back" style="display: none;">
-                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5;">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-            </button>
-            <div class="header-title" id="headerTitleText">شو بدنا ناكل</div>
-        </div>
-        <div class="header-badge">
-            <div class="pulse-dot"></div>
-            <span>مباشر</span>
-        </div>
-    </header>
+<!-- ============================ APP BAR ============================ -->
+<header class="appbar">
+    <div class="appbar-inner shell">
+        <button class="appbar-back" id="backBtn" onclick="window.goBack()" aria-label="رجوع">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+        </button>
+        <div class="appbar-title" id="headerTitleText">شو بدنا ناكل</div>
+        <div class="appbar-spacer"></div>
+    </div>
+</header>
 
-    <div class="logo-section" id="defaultLogoSection" style="text-align: center;">
-        <div class="logo-circle-glow" style="display: inline-block;">
-            <div class="logo-circle" style="margin: 0 auto;">
-                <img src="iconnn.jpeg" alt="Logo" class="logo-img" onerror="this.src='https://via.placeholder.com/150'">
+<!-- ============================ MAIN ============================ -->
+<main class="main shell">
+
+    <!-- ---------------- PAGE 1: HOME ---------------- -->
+    <div class="view-page active" id="pageHome">
+
+        <div class="masthead" id="defaultLogoSection">
+            <div class="masthead-logo">
+                <img src="iconnn.jpeg" alt="شعار شو بدنا ناكل">
+            </div>
+            <div class="masthead-copy">
+                <div class="wordmark">SHU BADNA <span>NEKOL</span></div>
+                <p class="masthead-tagline">دليلك الأول للمطاعم التي تستحق التجربة</p>
             </div>
         </div>
-        <h1 class="brand-text" style="text-align: center; margin-top: 6px;">SHU BADNA <span style="color: #008080;">NEKOL</span></h1>
-        <p class="brand-slogan" style="text-align: center; margin-top: 2px;">دليلك الأول للمطاعم التي تستحق التجربة</p>
-    </div>
 
-    <!-- PAGE 1: HOME -->
-    <div class="view-page active" id="pageHome">
-        <a href="javascript:void(0);" onclick="window.openCategories && window.openCategories()" class="region-card-link" role="button">
-            <div class="region-card">
-                <img src="https://lh3.googleusercontent.com/d/1doCOmMqmtbPIMdy4ZnvUx1pIsI3csgjl" alt="Dahyeh Region">
-                <div class="region-overlay">
-                    <span class="region-badge">منطقة الضاحية</span>
+        <div class="home-top">
+            <a href="javascript:void(0);" onclick="window.openCategories && window.openCategories()" class="region-card">
+                <img class="region-img" src="https://lh3.googleusercontent.com/d/1doCOmMqmtbPIMdy4ZnvUx1pIsI3csgjl" alt="منطقة الضاحية">
+                <div class="region-body">
+                    <span class="chip chip-accent">منطقة الضاحية</span>
                     <h2 class="region-title">EL DAHYE</h2>
-                    <p style="text-align: center;">اضغط لتشوف شو عبالك تاكل</p>
+                    <p class="region-sub">
+                        اضغط لتشوف شو عبالك تاكل
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    </p>
+                </div>
+            </a>
+
+            <div class="home-side">
+                <nav class="quicklinks" aria-label="روابط سريعة">
+                    <button type="button" class="quicklink" onclick="window.openCategories && window.openCategories()">
+                        <span class="quicklink-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/>
+                                <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/>
+                            </svg>
+                        </span>
+                        <span class="quicklink-label">تصفّح الأقسام</span>
+                        <svg class="quicklink-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+
+                    <a class="quicklink is-wa" href="https://wa.me/96170725668" target="_blank" rel="noopener noreferrer">
+                        <span class="quicklink-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20.5 11.6a8.4 8.4 0 0 1-12.3 7.4L3.5 20.5l1.6-4.6A8.4 8.4 0 1 1 20.5 11.6z"/>
+                                <path d="M8.8 9.2c.2 2.4 3.6 5.8 6 6l1.2-1.4-1.9-1.2-1 .8c-.9-.4-2-1.5-2.4-2.4l.8-1-1.2-1.9-1.5 1.1z"/>
+                            </svg>
+                        </span>
+                        <span class="quicklink-label">خدمة العملاء</span>
+                        <span class="quicklink-meta">واتساب</span>
+                        <svg class="quicklink-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                    </a>
+                </nav>
+
+                <p class="editorial">الحياة صار إلها طعمة</p>
+            </div>
+        </div>
+
+        <section class="install">
+            <div class="install-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
+                ثبّت التطبيق على شاشتك
+            </div>
+            <div class="install-body">
+                <div class="pwa-download-container" id="androidInstallContainer">
+                    <button onclick="window.triggerInstallModal && window.triggerInstallModal()" class="pwa-download-btn" id="androidInstallBtn" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                        تنزيل التطبيق على أندرويد
+                    </button>
+                </div>
+                <div class="pwa-download-container" id="iosInstallContainer">
+                    <button onclick="openIosGuide()" class="pwa-download-btn" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
+                        طريقة التثبيت على آيفون (شرح بالصور)
+                    </button>
                 </div>
             </div>
-        </a>
+        </section>
+    </div>
 
-        <div class="app-features-strip">
-            <div class="feature-pill clickable-pill" onclick="window.open('https://wa.me/96170725668', '_blank')">خدمة عملاء</div>
-            <div class="feature-pill clickable-pill" onclick="window.openCategories && window.openCategories()">خريطة مباشرة</div>
-            <a href="https://wa.me/96170725668" target="_blank" style="text-decoration: none; color: inherit;">
-                <div class="feature-pill clickable-pill">تواصل واتساب</div>
-            </a>
-        </div>
-        <br>
-        <div class="feature-pill" style="text-align: center; font-weight: 800; color: #008080;">
-         الحياة صار إلها طعمة
-        </div>
-
-        <div class="pwa-download-container" id="androidInstallContainer">
-            <button onclick="window.triggerInstallModal && window.triggerInstallModal()" class="pwa-download-btn" id="androidInstallBtn">
-                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                تنزيل التطبيق على اندرويد
+    <!-- ---------------- PAGE 2: CATEGORIES ---------------- -->
+    <div class="view-page" id="pageCategories">
+        <div class="search-field">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/></svg>
+            <input type="text" id="categoriesSearchInput" class="search-input" placeholder="ابحث عن قسم معين..." oninput="window.filterCategories()">
+            <button type="button" class="search-clear" aria-label="مسح البحث">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
         </div>
-<br>
-      <div class="pwa-download-container" id="iosInstallContainer">
-    <button onclick="openIosGuide()" class="pwa-download-btn">
-        <svg viewBox="0 0 24 24" width="20" height="20" style="margin-left: 8px;"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-        طريقة التثبيت على أيفون (شرح بالصور) 🍏
-    </button>
-</div>
 
-<div id="pwaModal" class="pwa-modal-overlay">
-    <div class="pwa-modal-content">
-        <h3>تثبيت التطبيق 📲</h3>
-        <p>ثبّت موقعنا كتطبيق مستقل على شاشة هاتفك لفتحه بسرعة وبدون متصفح.</p>
-        <div class="pwa-modal-actions">
-            <button class="pwa-install-confirm" id="pwaInstallBtn">تثبيت الآن</button>
-            <button class="pwa-install-cancel" id="pwaCloseBtn">لاحقاً</button>
+        <div class="section-head">
+            <h1 class="section-title">شو عبالك اليوم؟</h1>
+            <span class="section-sub">اختر نوع الأكل</span>
         </div>
-    </div>
-</div>
 
-<div id="iosGuideModal" class="ios-modal-overlay" style="display: none;">
-    <div class="ios-modal-content">
-        <button class="ios-close-btn" onclick="closeIosGuide()">&times;</button>
-        <h3>طريقة إضافة التطبيق إلى الشاشة الرئيسية</h3>
-        
-        <div class="ios-steps-scroll">
-            <div class="ios-step-card">
-                <p>1. افتح الموقع من متصفح Safari</p>
-                <img src="https://github.com/shubadnanotlobb/shubadnanotlob/blob/main/9e460dbd-cee2-4bb4-80ba-506e306bfb9c.jpg?raw=true" alt="الخطوة 1" onerror="this.src='https://via.placeholder.com/350x250?text=Step+1'">
-            </div>
-            <div class="ios-step-card">
-                <p>2. اضغط على الثلاث نقاط أو زر المشاركة</p>
-                <img src="WhatsApp Image 2026-09-28 at 20.57.33.jpeg" alt="الخطوة 2" onerror="this.src='https://via.placeholder.com/350x250?text=Step+2'">
-            </div>
-            <div class="ios-step-card">
-                <p>3. اختر خيار المشاركة أو الإضافة</p>
-                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (1).jpeg?raw=true" alt="الخطوة 3" onerror="this.src='https://via.placeholder.com/350x250?text=Step+3'">
-            </div>
-            <div class="ios-step-card">
-                <p>4. اضغط على view more</p>
-                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (2).jpeg" alt="الخطوة 4" onerror="this.src='https://via.placeholder.com/350x250?text=Step+2'">
-            </div>
-            <div class="ios-step-card">
-                <p>5. اضغط على add to home screen </p>
-                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (3).jpeg" alt="الخطوة 5" onerror="this.src='https://via.placeholder.com/350x250?text=Step+2'">
-            </div>
-            <div class="ios-step-card">
-                <p>6. اضغط على Add</p>
-                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (4).jpeg" alt="الخطوة 2" onerror="this.src='https://via.placeholder.com/350x250?text=Step+2'">
-            </div>
-        </div>
-        
-        <button class="ios-done-btn" onclick="closeIosGuide()">اغلاق!</button>
-    </div>
-</div>
-    </div>
-
-    <!-- PAGE 2: CATEGORIES -->
-    <div class="view-page" id="pageCategories">
-        <div class="search-box">
-            <input type="text" id="categoriesSearchInput" class="search-input" placeholder="ابحث عن قسم معين..." oninput="window.filterCategories()">
-            <div class="search-icon"><svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
-        </div>
-        <div class="section-header-box"><div class="section-question">شو عبالك اليوم؟</div></div>
         <div class="categories-grid" id="categoriesGridContainer"></div>
     </div>
 
-    <!-- PAGE 3: RESTAURANTS -->
+    <!-- ---------------- PAGE 3: RESTAURANTS ---------------- -->
     <div class="view-page" id="pageRestaurants">
-        <div class="category-hero">
-            <img id="categoryHeroImg" src="" alt="Category Banner">
-            <div class="category-hero-overlay"></div>
-            <div class="category-hero-title" id="categoryHeroTitle">المطاعم</div>
+        <div class="cat-strip">
+            <img id="categoryHeroImg" class="cat-strip-img" alt="">
+            <div class="cat-strip-copy">
+                <div class="cat-strip-label">القسم المختار</div>
+                <h1 class="cat-strip-title" id="categoryHeroTitle">المطاعم</h1>
+            </div>
         </div>
-        <div class="search-box">
+
+        <div class="search-field">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/></svg>
             <input type="text" id="restaurantsSearchInput" class="search-input" placeholder="ابحث عن مطعم محدد..." oninput="window.filterRestaurants()">
-            <div class="search-icon"><svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+            <button type="button" class="search-clear" aria-label="مسح البحث">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
         </div>
+
         <div class="restaurants-grid" id="restaurantsListContainer"></div>
     </div>
 
-    <!-- PAGE 4: PROFILE -->
+    <!-- ---------------- PAGE 4: RESTAURANT PROFILE ---------------- -->
     <div class="view-page" id="pageRestProfile">
-        <div class="profile-hero">
-            <img id="profileLogo" src="" alt="Restaurant Logo">
-            <h2 id="profileName">اسم المطعم</h2>
-            <p id="profileDesc">وصف المطعم</p>
+        <div class="profile-cover" id="profileCover" hidden>
+            <img id="profileCoverImg" alt="">
         </div>
-        <div class="section-header-box"><div class="section-question">معرض الصور • Gallery</div></div>
-        <div class="gallery-grid" id="profileGalleryContainer"></div>
-        <div class="profile-actions-bottom">
-            <a id="profileMenuBtn" href="#" target="_blank" class="action-btn btn-menu">MENU</a>
-            <a id="profileContactBtn" href="javascript:void(0);" onclick="window.sendSecureOrderWhatsApp()" class="action-btn btn-contact">CONTACT</a>
-            <a id="profileLocationBtn" href="#" target="_blank" class="action-btn btn-location">LOCATION</a>
+
+        <div class="profile-head">
+            <img id="profileLogo" class="profile-logo" alt="">
+            <div class="profile-identity">
+                <span class="status is-open" id="profileStatus" hidden><i></i><span class="status-text"></span></span>
+                <h1 class="profile-title" id="profileName">اسم المطعم</h1>
+                <p class="profile-desc" id="profileDesc">وصف المطعم</p>
+            </div>
+        </div>
+
+        <div class="profile-layout">
+            <div class="profile-cta">
+                <a id="profileContactBtn" href="#" target="_blank" rel="noopener noreferrer"
+                   class="btn btn-wa btn-lg btn-block"
+                   onclick="return this.getAttribute('href') !== '#'">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.03 0C5.4 0 .01 5.39.01 12.02c0 2.12.55 4.19 1.6 6.01L0 24l6.15-1.61a11.97 11.97 0 0 0 5.88 1.53h.01c6.63 0 12.02-5.39 12.02-12.02C24.06 5.39 18.66 0 12.03 0zm0 22.03h-.01c-1.8 0-3.56-.48-5.11-1.4l-.37-.22-3.8 1 1.01-3.7-.24-.38a9.97 9.97 0 0 1-1.53-5.32c0-5.51 4.48-9.99 9.99-9.99 5.51 0 9.99 4.48 9.99 9.99 0 5.51-4.48 10.02-9.99 10.02z"/></svg>
+                    تواصل عبر واتساب
+                </a>
+                <div class="profile-cta-row">
+                    <a id="profileMenuBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-ghost">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9.5 13h5M9.5 17h5"/></svg>
+                        المنيو
+                    </a>
+                    <a id="profileLocationBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-ghost">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                        الموقع
+                    </a>
+                </div>
+            </div>
+
+            <div class="profile-gallery">
+                <div class="section-head">
+                    <h2 class="section-title">معرض الصور</h2>
+                    <span class="section-sub">اضغط للتكبير</span>
+                </div>
+                <div class="gallery-grid" id="profileGalleryContainer"></div>
+            </div>
         </div>
     </div>
 
-    <!-- PAGE 5: LOGIN -->
+    <!-- ---------------- PAGE 5: LOGIN ---------------- -->
     <div class="view-page" id="pageLogin">
-        <div class="admin-box glass-panel">
-            <h3 style="margin-bottom: 15px; color: #008080; font-size: 16px;">Admin Authentication</h3>
-            <form onsubmit="return false;" autocomplete="off">
-                <div class="admin-form-group">
-                    <label>Email Address / Username</label>
-                    <input type="text" id="loginUsername" placeholder="Enter username" autocomplete="off" name="admin_user_field" readonly onfocus="this.removeAttribute('readonly');">
+        <div class="auth">
+            <div class="auth-head">
+                <div class="auth-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
                 </div>
-                <div class="admin-form-group">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="new-password" name="admin_pass_field" readonly onfocus="this.removeAttribute('readonly');">
+                <h1 class="auth-title">تسجيل الدخول</h1>
+                <p class="auth-sub">لوحة إدارة المطاعم والأقسام</p>
+            </div>
+
+            <form class="panel" onsubmit="return false;" autocomplete="off">
+                <div class="field admin-form-group">
+                    <label class="field-label" for="loginUsername">اسم المستخدم</label>
+                    <input class="field-control" type="text" id="loginUsername" placeholder="اسم المستخدم" autocomplete="off" name="admin_user_field" readonly onfocus="this.removeAttribute('readonly');">
                 </div>
-                <button class="admin-btn" type="button" onclick="window.performAdminLogin()">Login to Dashboard</button>
+                <div class="field admin-form-group">
+                    <label class="field-label" for="loginPassword">كلمة المرور</label>
+                    <input class="field-control" type="password" id="loginPassword" placeholder="••••••••" autocomplete="new-password" name="admin_pass_field" readonly onfocus="this.removeAttribute('readonly');">
+                </div>
+                <button class="btn btn-primary btn-lg btn-block" type="button" onclick="window.performAdminLogin()">دخول إلى اللوحة</button>
             </form>
         </div>
     </div>
 
-    <!-- PAGE 6: ADMIN DASHBOARD -->
+    <!-- ---------------- PAGE 6: ADMIN DASHBOARD ---------------- -->
     <div class="view-page" id="pageAdmin">
+        <div class="admin-grid">
 
-        <div class="admin-box glass-panel">
-            <h3 id="categoryFormTitle" style="color: #008080; font-size: 15px; margin-bottom: 12px;">Add / Edit Category</h3>
-            <input type="hidden" id="editCatDocId">
+            <div class="admin-col">
 
-            <div class="admin-form-group">
-                <label>Category Name (Arabic)</label>
-                <input type="text" id="adminCatAr" placeholder="مثال: سناك ومأكولات سريعة">
+                <!-- Category form -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3 class="panel-title" id="categoryFormTitle">إضافة / تعديل قسم</h3>
+                    </div>
+                    <input type="hidden" id="editCatDocId">
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCatAr">اسم القسم (عربي)</label>
+                        <input class="field-control" type="text" id="adminCatAr" placeholder="مثال: سناك ومأكولات سريعة">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCatEn">اسم القسم (إنجليزي)</label>
+                        <input class="field-control" type="text" id="adminCatEn" placeholder="e.g. Snack &amp; Fast Food">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCatOrder">ترتيب القسم (رقمي)</label>
+                        <input class="field-control" type="number" id="adminCatOrder" placeholder="1, 2, 3..." inputmode="numeric">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCatFile">صورة القسم (رفع ملف)</label>
+                        <input type="file" id="adminCatFile" accept="image/*">
+                        <div class="upload-help-text">اختر صورة القسم من جهازك</div>
+                        <img id="catPreview" class="image-upload-preview" alt="معاينة القسم">
+                        <input class="field-control field-control--follow" type="text" id="adminCatImg" placeholder="أو ضع رابط صورة مباشرة">
+                    </div>
+
+                    <div class="admin-actions">
+                        <button class="btn btn-primary" type="button" onclick="window.saveCategoryToFirebase()">حفظ القسم</button>
+                        <button class="btn btn-quiet" type="button" onclick="window.resetCategoryForm()">إعادة تعيين</button>
+                    </div>
+
+                    <hr class="divider">
+                    <h4 class="panel-subtitle">الأقسام المنشورة</h4>
+                    <div id="adminManageCategoriesContainer" class="admin-list"></div>
+                </section>
+
+                <!-- Restaurant form -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3 class="panel-title" id="formTitle">إضافة مطعم جديد</h3>
+                        <button class="btn btn-danger btn-sm" type="button" onclick="window.logoutAdmin()">خروج</button>
+                    </div>
+                    <input type="hidden" id="editDocId">
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCategory">القسم</label>
+                        <select class="field-control" id="adminCategory"></select>
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminName">اسم المطعم</label>
+                        <input class="field-control" type="text" id="adminName" placeholder="e.g. Gorella Food Truck">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminDesc">الوصف / الشعار النصي</label>
+                        <input class="field-control" type="text" id="adminDesc" placeholder="e.g. Best Burgers in Town">
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field admin-form-group">
+                            <label class="field-label" for="adminOpenTime">ساعة الفتح</label>
+                            <input class="field-control" type="time" id="adminOpenTime" value="11:00">
+                        </div>
+                        <div class="field admin-form-group">
+                            <label class="field-label" for="adminCloseTime">ساعة الإغلاق</label>
+                            <input class="field-control" type="time" id="adminCloseTime" value="02:00">
+                        </div>
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminCoverFile">صورة الخلفية (الغلاف)</label>
+                        <input type="file" id="adminCoverFile" accept="image/*">
+                        <div class="upload-help-text">اختر صورة الخلفية الكبيرة للمطعم من جهازك</div>
+                        <img id="coverPreview" class="image-upload-preview" alt="معاينة الغلاف">
+                        <input class="field-control field-control--follow" type="text" id="adminCover" placeholder="أو ضع رابط صورة الخلفية مباشرة">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminLogoFile">شعار المطعم</label>
+                        <input type="file" id="adminLogoFile" accept="image/*">
+                        <div class="upload-help-text">اختر شعار المطعم من جهازك</div>
+                        <img id="logoPreview" class="image-upload-preview" alt="معاينة الشعار">
+                        <input class="field-control field-control--follow" type="text" id="adminLogo" placeholder="أو ضع رابط صورة الشعار مباشرة">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminGalleryFiles">صور المعرض</label>
+                        <input type="file" id="adminGalleryFiles" accept="image/*" multiple>
+                        <div class="upload-help-text">يمكنك اختيار عدة صور من جهازك (حتى 20)</div>
+                        <div id="galleryPreview" class="gallery-upload-preview"></div>
+                        <input class="field-control field-control--follow" type="text" id="adminGallery" placeholder="أو ضع روابط الصور مفصولة بفواصل">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminPhone">رقم واتساب (بدون +)</label>
+                        <input class="field-control" type="text" id="adminPhone" placeholder="96170725668" inputmode="tel" dir="ltr">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminMenu">رابط المنيو (PDF أو رابط)</label>
+                        <input class="field-control" type="text" id="adminMenu" placeholder="https://..." dir="ltr">
+                    </div>
+
+                    <div class="field admin-form-group">
+                        <label class="field-label" for="adminMap">رابط موقع خرائط جوجل</label>
+                        <input class="field-control" type="text" id="adminMap" placeholder="https://maps.app.goo.gl/..." dir="ltr">
+                    </div>
+
+                    <div class="admin-actions">
+                        <button class="btn btn-primary" type="button" onclick="window.saveRestaurantToFirebase()">حفظ المطعم</button>
+                        <button class="btn btn-quiet" type="button" onclick="window.resetAdminForm()">إعادة تعيين</button>
+                    </div>
+                </section>
             </div>
 
-            <div class="admin-form-group">
-                <label>Category Name (English)</label>
-                <input type="text" id="adminCatEn" placeholder="e.g. Snack & Fast Food">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Category Order (الترتيب الرقمي)</label>
-                <input type="number" id="adminCatOrder" placeholder="1, 2, 3...">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Category Image (Upload File)</label>
-                <input type="file" id="adminCatFile" accept="image/*">
-                <div class="upload-help-text">اختر صورة القسم من جهازك</div>
-                <img id="catPreview" class="image-upload-preview" alt="Category Preview">
-                <input type="text" id="adminCatImg" placeholder="أو ضع رابط صورة مباشرة" style="margin-top: 8px;">
-            </div>
-
-            <div style="display: flex; gap: 8px;">
-                <button class="admin-btn" type="button" onclick="window.saveCategoryToFirebase()">Save Category</button>
-                <button class="admin-btn" type="button" style="background: #777;" onclick="window.resetCategoryForm()">Reset</button>
-            </div>
-
-            <h4 style="color: #008080; font-size: 13px; margin-top: 15px; margin-bottom: 10px;">Active Categories List</h4>
-            <div id="adminManageCategoriesContainer"></div>
+            <!-- Lists -->
+            <aside class="admin-col admin-col-side">
+                <section class="panel">
+                    <div class="panel-head">
+                        <h4 class="panel-title">المطاعم المنشورة</h4>
+                    </div>
+                    <div id="adminManageListContainer" class="admin-list"></div>
+                </section>
+            </aside>
         </div>
-
-
-        <div class="admin-box glass-panel">
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 id="formTitle" style="color: #008080; font-size: 15px;">Add New Restaurant</h3>
-
-                <button
-                    class="admin-btn admin-btn-logout"
-                    type="button"
-                    style="width: auto; padding: 6px 12px; font-size: 11px; margin-top: 0;"
-                    onclick="window.logoutAdmin()">
-                    Logout
-                </button>
-            </div>
-
-            <input type="hidden" id="editDocId">
-
-            <div class="admin-form-group">
-                <label>Category</label>
-                <select id="adminCategory"></select>
-            </div>
-
-            <div class="admin-form-group">
-                <label>Restaurant Name</label>
-                <input type="text" id="adminName" placeholder="e.g. Gorella Food Truck">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Description / Tagline</label>
-                <input type="text" id="adminDesc" placeholder="e.g. Best Burgers in Town">
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <div class="admin-form-group" style="flex: 1;">
-                    <label>Opening Time (ساعة الفتح)</label>
-                    <input type="time" id="adminOpenTime" value="11:00">
-                </div>
-                <div class="admin-form-group" style="flex: 1;">
-                    <label>Closing Time (ساعة الإغلاق)</label>
-                    <input type="time" id="adminCloseTime" value="02:00">
-                </div>
-            </div>
-
-            <div class="admin-form-group">
-                <label>Restaurant Cover Background Image (صورة خلفية الكارت)</label>
-                <input type="file" id="adminCoverFile" accept="image/*">
-                <div class="upload-help-text">اختر صورة الخلفية الكبيرة للمطعم من جهازك</div>
-                <img id="coverPreview" class="image-upload-preview" alt="Cover Preview">
-                <input type="text" id="adminCover" placeholder="أو ضع رابط صورة الخلفية مباشرة" style="margin-top: 8px;">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Restaurant Logo (شعار المطعم الدائري)</label>
-                <input type="file" id="adminLogoFile" accept="image/*">
-                <div class="upload-help-text">اختر شعار المطعم من جهازك</div>
-                <img id="logoPreview" class="image-upload-preview" alt="Logo Preview">
-                <input type="text" id="adminLogo" placeholder="أو ضع رابط صورة الشعار مباشرة" style="margin-top: 8px;">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Gallery Images (معرض الصور)</label>
-                <input type="file" id="adminGalleryFiles" accept="image/*" multiple>
-                <div class="upload-help-text">يمكنك اختيار عدة صور من جهازك</div>
-                <div id="galleryPreview" class="gallery-upload-preview"></div>
-                <input type="text" id="adminGallery" placeholder="أو ضع روابط الصور مفصولة بفواصل" style="margin-top: 8px;">
-            </div>
-
-            <div class="admin-form-group">
-                <label>WhatsApp Number (without +)</label>
-                <input type="text" id="adminPhone" placeholder="96170725668">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Menu Link (PDF or URL)</label>
-                <input type="text" id="adminMenu" placeholder="https://...">
-            </div>
-
-            <div class="admin-form-group">
-                <label>Google Maps Location Link</label>
-                <input type="text" id="adminMap" placeholder="https://maps.app.goo.gl/...">
-            </div>
-
-            <div style="display: flex; gap: 8px;">
-                <button class="admin-btn" type="button" onclick="window.saveRestaurantToFirebase()">Save Restaurant</button>
-                <button class="admin-btn" type="button" style="background: #777;" onclick="window.resetAdminForm()">Reset</button>
-            </div>
-
-        </div>
-
-        <div class="admin-box glass-panel">
-            <h4 style="color: #008080; font-size: 13px; margin-bottom: 10px;">Active Firebase Restaurants</h4>
-            <div id="adminManageListContainer"></div>
-        </div>
-
     </div>
 
-    <!-- Floating WhatsApp -->
-    <a href="https://wa.me/96170725668" target="_blank" class="floating-whatsapp" aria-label="Contact WhatsApp">
-        <svg viewBox="0 0 24 24">
-            <path d="M12.031 0C5.39 0 0 5.39 0 12.031c0 2.122.553 4.195 1.607 6.013L0 24l6.147-1.612a11.97 11.97 0 005.884 1.533h.005c6.64 0 12.03-5.39 12.03-12.031C24.066 5.39 18.671 0 12.031 0zm0 22.028h-.004c-1.8 0-3.564-.484-5.112-1.403l-.367-.218-3.799.996 1.014-3.702-.24-.381A9.972 9.972 0 012.036 12.03c0-5.511 4.484-9.995 9.995-9.995 5.511 0 9.995 4.484 9.995 9.995 0 5.511-4.484 9.998-9.995 9.998z"/>
-        </svg>
-    </a>
+</main>
 
-    <!-- Footer -->
-    <footer class="app-footer" style="position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; font-size: 10px; color: #8b949e; background: #0d1117; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; padding: 6px 0;">
-        <a href="javascript:void(0);" onclick="window.checkAdminAccess && window.checkAdminAccess()" style="color: inherit; text-decoration: none; display: block; font-weight: 300; letter-spacing: 0.5px;">
+<!-- ============================ FOOTER ============================ -->
+<footer class="appfoot">
+    <div class="appfoot-inner shell">
+        <a href="javascript:void(0);" onclick="window.checkAdminAccess && window.checkAdminAccess()" class="appfoot-link">
             SHU BADNA NEKOL 2026 © جميع الحقوق محفوظة
         </a>
-    </footer>
+    </div>
+</footer>
 
+<!-- ============================ FLOATING WHATSAPP ============================ -->
+<a href="https://wa.me/96170725668" target="_blank" rel="noopener noreferrer" class="floating-whatsapp" aria-label="تواصل عبر واتساب">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12.031 0C5.39 0 0 5.39 0 12.031c0 2.122.553 4.195 1.607 6.013L0 24l6.147-1.612a11.97 11.97 0 005.884 1.533h.005c6.64 0 12.03-5.39 12.03-12.031C24.066 5.39 18.671 0 12.031 0zm0 22.028h-.004c-1.8 0-3.564-.484-5.112-1.403l-.367-.218-3.799.996 1.014-3.702-.24-.381A9.972 9.972 0 012.036 12.03c0-5.511 4.484-9.995 9.995-9.995 5.511 0 9.995 4.484 9.995 9.995 0 5.511-4.484 9.998-9.995 9.998z"/>
+    </svg>
+</a>
+
+<!-- ============================ PWA INSTALL DIALOG ============================ -->
+<div id="pwaModal" class="pwa-modal-overlay">
+    <div class="pwa-modal-content" role="dialog" aria-modal="true" aria-labelledby="pwaModalTitle">
+        <h3 id="pwaModalTitle">تثبيت التطبيق</h3>
+        <p>ثبّت موقعنا كتطبيق مستقل على شاشة هاتفك لتفتحه بسرعة وبدون متصفح.</p>
+        <div class="pwa-modal-actions">
+            <button class="pwa-install-confirm" id="pwaInstallBtn" type="button">تثبيت الآن</button>
+            <button class="pwa-install-cancel" id="pwaCloseBtn" type="button">لاحقاً</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================ iOS INSTALL GUIDE ============================ -->
+<div id="iosGuideModal" class="ios-modal-overlay">
+    <div class="ios-modal-content" role="dialog" aria-modal="true" aria-labelledby="iosGuideTitle">
+        <button class="ios-close-btn" onclick="closeIosGuide()" aria-label="إغلاق">&times;</button>
+        <h3 id="iosGuideTitle">طريقة إضافة التطبيق إلى الشاشة الرئيسية</h3>
+
+        <div class="ios-steps-scroll">
+            <div class="ios-step-card">
+                <p>1. افتح الموقع من متصفح Safari</p>
+                <img src="https://github.com/shubadnanotlobb/shubadnanotlob/blob/main/9e460dbd-cee2-4bb4-80ba-506e306bfb9c.jpg?raw=true" alt="الخطوة 1" loading="lazy">
+            </div>
+            <div class="ios-step-card">
+                <p>2. اضغط على الثلاث نقاط أو زر المشاركة</p>
+                <img src="WhatsApp Image 2026-09-28 at 20.57.33.jpeg" alt="الخطوة 2" loading="lazy">
+            </div>
+            <div class="ios-step-card">
+                <p>3. اختر خيار المشاركة أو الإضافة</p>
+                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (1).jpeg" alt="الخطوة 3" loading="lazy">
+            </div>
+            <div class="ios-step-card">
+                <p>4. اضغط على view more</p>
+                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (2).jpeg" alt="الخطوة 4" loading="lazy">
+            </div>
+            <div class="ios-step-card">
+                <p>5. اضغط على add to home screen</p>
+                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (3).jpeg" alt="الخطوة 5" loading="lazy">
+            </div>
+            <div class="ios-step-card">
+                <p>6. اضغط على Add</p>
+                <img src="WhatsApp Image 2026-09-28 at 20.57.33 (4).jpeg" alt="الخطوة 6" loading="lazy">
+            </div>
+        </div>
+
+        <button class="ios-done-btn" onclick="closeIosGuide()" type="button">إغلاق</button>
+    </div>
+</div>
+
+<!-- ============================ TOASTS ============================ -->
+<div class="toast-stack" id="toastStack" role="status" aria-live="polite"></div>
+
+<!-- ============================ CONFIRM DIALOG ============================ -->
+<div class="dialog-backdrop" id="dialogBackdrop" hidden>
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMessage">
+        <h2 class="dialog-title" id="dialogTitle">تأكيد</h2>
+        <p class="dialog-msg" id="dialogMessage"></p>
+        <div class="dialog-actions">
+            <button class="btn btn-quiet" id="dialogCancel" type="button">إلغاء</button>
+            <button class="btn btn-danger" id="dialogConfirm" type="button">تأكيد</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================ LIGHTBOX ============================ -->
+<div class="lightbox" id="lightbox" hidden>
+    <button class="lightbox-close" id="lightboxClose" type="button" aria-label="إغلاق">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <button class="lightbox-nav lightbox-prev" id="lightboxPrev" type="button" aria-label="الصورة السابقة">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <img class="lightbox-img" id="lightboxImg" alt="صورة المعرض">
+    <button class="lightbox-nav lightbox-next" id="lightboxNext" type="button" aria-label="الصورة التالية">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <div class="lightbox-count" id="lightboxCount"></div>
 </div>
 
 <script type="module" src="script.js"></script>

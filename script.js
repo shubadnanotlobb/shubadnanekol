@@ -48,6 +48,10 @@ let currentCategoryFilter = localStorage.getItem("currentCategoryFilter") || "";
 let allRestaurants = [];
 let allCategories = [];
 
+// Design-system state: are the Firestore snapshots in yet?
+let categoriesLoaded = false;
+let restaurantsLoaded = false;
+
 
 // ============================================================
 // HELPER: SHUFFLE ARRAY (خلط عشوائي)
@@ -63,10 +67,240 @@ function shuffleArray(array) {
 }
 
 // ============================================================
+// UI LAYER — TOASTS, CONFIRM DIALOG, LIGHTBOX, LIST STATES
+// (presentation only; no data / routing / auth behaviour changes)
+// ============================================================
+
+function inferToastType(message) {
+  const m = String(message === null || message === undefined ? "" : message);
+  if (/بنجاح/.test(m)) return "success";
+  if (
+    /حدث خطأ|يرجى|غير صحيحة|لا يمكن|يمكنك اختيار|أكبر من|حجم صورة|عدد صور/.test(m)
+  )
+    return "error";
+  if (/للتثبيت يدوياً|ميزة التثبيت/.test(m)) return "info";
+  return "info";
+}
+
+/**
+ * Native `alert()` is replaced across the whole module by the design-system
+ * toast. The module-level binding shadows `window.alert`; any external code
+ * still gets the browser default because `window.alert` is untouched.
+ */
+const alert = (message) => showToast(message, inferToastType(message));
+
+function showToast(message, type = "info", duration = 3800) {
+  const stack = document.getElementById("toastStack");
+  if (!stack) return;
+
+  while (stack.children.length >= 3) {
+    stack.removeChild(stack.firstElementChild);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast is-" + type;
+
+  const mark = document.createElement("span");
+  mark.className = "toast-mark";
+
+  const body = document.createElement("div");
+  body.className = "toast-body";
+  body.textContent = message === null || message === undefined ? "" : String(message);
+
+  toast.appendChild(mark);
+  toast.appendChild(body);
+  stack.appendChild(toast);
+
+  window.setTimeout(() => {
+    if (!toast.isConnected) return;
+    toast.classList.add("is-out");
+    window.setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 200);
+  }, duration);
+}
+
+function showConfirm(message, title = "تأكيد", confirmLabel = "تأكيد") {
+  return new Promise(resolve => {
+    const backdrop = document.getElementById("dialogBackdrop");
+    const titleEl = document.getElementById("dialogTitle");
+    const msgEl = document.getElementById("dialogMessage");
+    const okBtn = document.getElementById("dialogConfirm");
+    const cancelBtn = document.getElementById("dialogCancel");
+
+    if (!backdrop || !okBtn || !cancelBtn) {
+      resolve(window.confirm(message));
+      return;
+    }
+
+    const previousFocus =
+      document.activeElement && typeof document.activeElement.focus === "function"
+        ? document.activeElement
+        : null;
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    okBtn.textContent = confirmLabel;
+
+    backdrop.hidden = false;
+    document.body.classList.add("no-scroll");
+    okBtn.focus();
+
+    function close(value) {
+      backdrop.hidden = true;
+      document.body.classList.remove("no-scroll");
+      okBtn.removeEventListener("click", onConfirm);
+      cancelBtn.removeEventListener("click", onCancel);
+      backdrop.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      if (previousFocus) previousFocus.focus();
+      resolve(value);
+    }
+
+    function onConfirm() { close(true); }
+    function onCancel() { close(false); }
+    function onBackdrop(event) { if (event.target === backdrop) close(false); }
+    function onKey(event) {
+      if (event.key === "Escape") { event.preventDefault(); close(false); }
+      if (event.key === "Enter") { event.preventDefault(); close(true); }
+    }
+
+    okBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click", onCancel);
+    backdrop.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKey);
+  });
+}
+
+/* --- Gallery lightbox ------------------------------------------------- */
+let lightboxImages = [];
+let lightboxIndex = 0;
+
+function openLightbox(list, index) {
+  const box = document.getElementById("lightbox");
+  if (!box || !list || list.length === 0) return;
+  lightboxImages = list;
+  lightboxIndex = Math.min(Math.max(index || 0, 0), list.length - 1);
+  renderLightbox();
+  box.hidden = false;
+  document.body.classList.add("no-scroll");
+}
+
+function renderLightbox() {
+  const img = document.getElementById("lightboxImg");
+  const count = document.getElementById("lightboxCount");
+  const prev = document.getElementById("lightboxPrev");
+  const next = document.getElementById("lightboxNext");
+  const total = lightboxImages.length;
+
+  if (img) img.src = lightboxImages[lightboxIndex] || "";
+  if (count) count.textContent = (lightboxIndex + 1) + " / " + total;
+
+  const multi = total > 1;
+  if (prev) prev.hidden = !multi;
+  if (next) next.hidden = !multi;
+}
+
+function closeLightbox() {
+  const box = document.getElementById("lightbox");
+  if (!box) return;
+  box.hidden = true;
+  document.body.classList.remove("no-scroll");
+}
+
+function stepLightbox(delta) {
+  if (lightboxImages.length === 0) return;
+  lightboxIndex =
+    (lightboxIndex + delta + lightboxImages.length) % lightboxImages.length;
+  renderLightbox();
+}
+
+/* --- List states (skeleton / empty) ----------------------------------- */
+function emptyStateHtml(title, text) {
+  return (
+    '<div class="empty">' +
+      '<div class="empty-mark">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/>' +
+        "</svg>" +
+      "</div>" +
+      '<div class="empty-title">' + title + "</div>" +
+      '<div class="empty-text">' + text + "</div>" +
+    "</div>"
+  );
+}
+
+function renderCategorySkeleton() {
+  const grid = document.getElementById("categoriesGridContainer");
+  if (!grid) return;
+  let html = "";
+  for (let i = 0; i < 6; i++) html += '<div class="skel skel-cat"></div>';
+  grid.innerHTML = html;
+}
+
+function renderRestaurantSkeleton() {
+  const box = document.getElementById("restaurantsListContainer");
+  if (!box) return;
+  let html = "";
+  for (let i = 0; i < 3; i++) html += '<div class="skel skel-rc"></div>';
+  box.innerHTML = html;
+}
+
+/* --- Broken-image fallback ------------------------------------------- */
+document.addEventListener(
+  "error",
+  event => {
+    const target = event.target;
+    if (target && target.tagName === "IMG" && target.getAttribute("src")) {
+      target.classList.add("is-broken");
+    }
+  },
+  true
+);
+
+document.addEventListener(
+  "load",
+  event => {
+    const target = event.target;
+    if (target && target.tagName === "IMG") target.classList.remove("is-broken");
+  },
+  true
+);
+
+/**
+ * Clicking a <div> is invisible to keyboards and screen readers. This gives
+ * the card list items the same semantics as a link without changing markup.
+ */
+function makeCardInteractive(el, handler) {
+  if (!el) return;
+  el.setAttribute("role", "button");
+  el.tabIndex = 0;
+  el.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      event.preventDefault();
+      handler(event);
+    }
+  });
+}
+
+// ============================================================
 // PAGE NAVIGATION (WITH PERFECT REFRESH HANDLER & PARENT PAGE FIX)
 // ============================================================
 
 let pageHistory = [];
+
+const PAGE_TITLES = {
+  pageHome: "شو بدنا ناكل",
+  pageCategories: "الأقسام",
+  pageRestaurants: "المطاعم",
+  pageRestProfile: "المطعم",
+  pageLogin: "تسجيل الدخول",
+  pageAdmin: "لوحة التحكم"
+};
+
+function getPageTitle(pageId) {
+  return PAGE_TITLES[pageId] || "شو بدنا ناكل";
+}
 
 function showPage(pageId, isBack = false) {
   const currentPage = document.querySelector(".view-page.active");
@@ -88,7 +322,14 @@ function showPage(pageId, isBack = false) {
 
   const backBtn = document.getElementById("backBtn");
   if (backBtn) {
-    backBtn.style.display = (pageId === "pageHome") ? "none" : "block";
+    backBtn.style.display = (pageId === "pageHome") ? "none" : "flex";
+  }
+
+  // Dynamic app-bar title — presentation only
+  const titleEl = document.getElementById("headerTitleText");
+  if (titleEl) {
+    titleEl.textContent = getPageTitle(pageId);
+    titleEl.dir = "auto";
   }
 
   // 1. حفظ الصفحة الحالية في رابط الـ URL عبر الـ Hash
@@ -228,7 +469,7 @@ function resetCategoryForm() {
 
   if (categoryFormTitle)
     categoryFormTitle.innerText =
-      "Add / Edit Category";
+      "إضافة / تعديل قسم";
 }
 
 
@@ -381,17 +622,19 @@ function editCategory(
 
   if (categoryFormTitle)
     categoryFormTitle.innerText =
-      "Edit Category";
+      "تعديل قسم";
 }
 
 
 async function deleteCategoryFromFirebase(id) {
 
-  if (
-    confirm(
-      "هل أنت متأكد من حذف هذا القسم؟"
-    )
-  ) {
+  const confirmed = await showConfirm(
+    "هل أنت متأكد من حذف هذا القسم؟",
+    "حذف القسم",
+    "حذف"
+  );
+
+  if (confirmed) {
 
     try {
 
@@ -559,7 +802,7 @@ function resetAdminForm() {
 
   if (formTitle)
     formTitle.innerText =
-      "Add New Restaurant";
+      "إضافة مطعم جديد";
 }
 
 
@@ -868,8 +1111,8 @@ async function saveRestaurantToFirebase() {
 
     saveButton.disabled = true;
 
-    saveButton.innerText =
-      "Uploading images...";
+    saveButton.innerHTML =
+      '<span class="spinner" aria-hidden="true"></span>جارٍ رفع الصور…';
 
   }
 
@@ -1271,7 +1514,7 @@ async function saveRestaurantToFirebase() {
         false;
 
       saveButton.innerText =
-        "Save Restaurant";
+        "حفظ المطعم";
 
     }
 
@@ -1286,11 +1529,13 @@ async function saveRestaurantToFirebase() {
 
 async function deleteRestaurantFromFirebase(id) {
 
-  if (
-    confirm(
-      "هل أنت متأكد من حذف هذا المطعم؟"
-    )
-  ) {
+  const confirmed = await showConfirm(
+    "هل أنت متأكد من حذف هذا المطعم؟",
+    "حذف المطعم",
+    "حذف"
+  );
+
+  if (confirmed) {
 
     try {
 
@@ -1478,8 +1723,20 @@ function filterCategories() {
 
   if (filtered.length === 0) {
 
-    grid.innerHTML =
-      '<p style="text-align: center; color: #777; width: 100%;">لا توجد أقسام مطابقة للبحث.</p>';
+    if (!categoriesLoaded) {
+      renderCategorySkeleton();
+      return;
+    }
+
+    grid.innerHTML = queryStr
+      ? emptyStateHtml(
+          "لا توجد نتائج",
+          "ما لقينا قسم بهذا الاسم. جرّب كلمة تانية."
+        )
+      : emptyStateHtml(
+          "لا توجد أقسام بعد",
+          "أضف الأقسام من لوحة الإدارة، ومنرجع تاني."
+        );
 
     return;
 
@@ -1504,20 +1761,33 @@ function filterCategories() {
         data.imgUrl
       );
 
+    makeCardInteractive(card, card.onclick);
+
 
     card.innerHTML = `
 
-      <img
-        src="${
-          data.imgUrl ||
-          "https://via.placeholder.com/150"
-        }"
-        alt="${data.nameAr || ""}"
-      >
-
-      <div class="category-title">
-        ${data.nameAr || ""}
+      <div class="cat-media">
+        <img
+          src="${
+            data.imgUrl ||
+            "https://via.placeholder.com/400x300"
+          }"
+          alt="${data.nameAr || ""}"
+          loading="lazy"
+          decoding="async"
+        >
       </div>
+
+      <div class="cat-body">
+        <span class="cat-name">${data.nameAr || ""}</span>
+        <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+
+      ${
+        data.nameEn
+          ? `<div class="cat-en">${data.nameEn}</div>`
+          : ""
+      }
 
     `;
 
@@ -1581,7 +1851,7 @@ function openRestaurantsByCategory(
 
 
   if (heroTitle)
-    heroTitle.innerText = catName;
+    heroTitle.innerText = catName || "المطاعم";
 
 
   if (heroImg)
@@ -1682,8 +1952,20 @@ function renderRestaurantsList(
 
   if (filtered.length === 0) {
 
-    container.innerHTML =
-      '<p style="text-align: center; color: #777; width: 100%;">لا توجد مطاعم حالياً.</p>';
+    if (!restaurantsLoaded) {
+      renderRestaurantSkeleton();
+      return;
+    }
+
+    container.innerHTML = searchQuery
+      ? emptyStateHtml(
+          "لا توجد نتائج",
+          "ما لقينا مطعم بهالاسم داخل هالقسم. جرّب اسم تاني."
+        )
+      : emptyStateHtml(
+          "ما في مطاعم هون لحدّا",
+          "جرّب قسم تاني أو تصفّح الأقسام الرئيسية."
+        );
 
     return;
 
@@ -1717,29 +1999,53 @@ function renderRestaurantsList(
     card.onclick = () =>
       openRestaurantProfile(r);
 
-    const formattedOpenTime = format12HourTime(r.openTime || "11:00");
+    makeCardInteractive(card, card.onclick);
 
-    const coverUrl = r.cover || r.logo || "https://via.placeholder.com/400x200";
-    const logoUrl = r.logo || "https://via.placeholder.com/100";
+    const formattedOpenTime = format12HourTime(r.openTime || "11:00");
+    const formattedCloseTime = format12HourTime(r.closeTime || "");
+
+    const logoUrl = r.logo || "https://via.placeholder.com/200";
+    const hasCover = !!(r.cover && String(r.cover).trim());
+
+    const mediaHtml = hasCover
+      ? `
+        <div class="rc-media">
+          <img class="rc-cover" src="${r.cover}" alt="" loading="lazy" decoding="async">
+          <img class="rc-logo" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+        </div>`
+      : `
+        <div class="rc-media is-brand">
+          <img class="rc-brand" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+        </div>`;
+
+    let timeText = "";
+
+    if (closed) {
+      timeText = r.openTime
+        ? `يفتح اليوم ${formattedOpenTime}`
+        : "مغلق حالياً";
+    } else {
+      timeText = formattedCloseTime ? `يغلق ${formattedCloseTime}` : "مفتوح الآن";
+    }
 
     card.innerHTML = `
-      <img class="restaurant-bg-img" src="${coverUrl}" alt="${r.name || ""}">
-      
-      <img class="restaurant-logo-badge" src="${logoUrl}" alt="${r.name || ""}">
 
-      ${closed ? `
-        <div class="restaurant-closed-overlay">
-          <div class="restaurant-closed-badge">
-            <div class="closed-badge-title">🌙 Closed</div>
-            <div class="closed-badge-sub">Opens today at ${formattedOpenTime}</div>
-          </div>
+      ${mediaHtml}
+
+      <div class="rc-body">
+        <div class="rc-head">
+          <h3 class="rc-name">${r.name || ""}</h3>
+          <span class="status ${closed ? "is-closed" : "is-open"}"><i></i>${closed ? "مغلق" : "مفتوح"}</span>
         </div>
-      ` : ''}
 
-      <div class="restaurant-info">
-        <h3>${r.name || ""}</h3>
-        <p>${r.desc || ""}</p>
+        <p class="rc-desc">${r.desc || ""}</p>
+
+        <div class="rc-meta">
+          <span class="rc-meta-time">${timeText}</span>
+          <svg class="rc-meta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </div>
       </div>
+
     `;
 
 
@@ -1763,36 +2069,126 @@ function fillRestaurantProfileDOM(r) {
   const contactBtn = document.getElementById("profileContactBtn");
   const locationBtn = document.getElementById("profileLocationBtn");
 
+  /* --- Cover banner (new presentation element) --- */
+  const coverWrap = document.getElementById("profileCover");
+  const coverImg = document.getElementById("profileCoverImg");
+  if (coverWrap && coverImg) {
+    if (r.cover) {
+      coverImg.src = r.cover;
+      coverImg.alt = (r.name || "") + " — صورة الغلاف";
+      coverWrap.hidden = false;
+    } else {
+      coverImg.removeAttribute("src");
+      coverWrap.hidden = true;
+    }
+  }
+
   if (profileLogo)
-    profileLogo.src = r.logo || "https://via.placeholder.com/100";
+    profileLogo.src = r.logo || "https://via.placeholder.com/200";
 
   if (profileName)
     profileName.innerText = r.name || "";
 
-  if (profileDesc)
+  if (profileDesc) {
     profileDesc.innerText = r.desc || "";
+    profileDesc.hidden = !String(r.desc || "").trim();
+  }
 
-  if (menuBtn)
+  /* --- Open / closed status chip --- */
+  const statusEl = document.getElementById("profileStatus");
+  if (statusEl) {
+    const closed = isRestaurantClosed(r.openTime, r.closeTime);
+    const openAt = format12HourTime(r.openTime || "");
+    const closeAt = format12HourTime(r.closeTime || "");
+
+    let statusLabel;
+    if (closed) {
+      statusLabel = openAt ? "مغلق · يفتح " + openAt : "مغلق الآن";
+    } else {
+      statusLabel = closeAt ? "مفتوح الآن · يغلق " + closeAt : "مفتوح الآن";
+    }
+
+    statusEl.className = "status " + (closed ? "is-closed" : "is-open");
+    const statusText = statusEl.querySelector(".status-text");
+    if (statusText) statusText.textContent = statusLabel;
+    statusEl.hidden = false;
+  }
+
+  /* --- Actions --- */
+  const hasPhone = !!(r.phone && String(r.phone).trim());
+  const hasMenu = !!(r.menu && String(r.menu).trim());
+  const hasMap = !!(r.map && String(r.map).trim());
+
+  if (menuBtn) {
     menuBtn.href = r.menu || "#";
+    menuBtn.hidden = !hasMenu;
+  }
 
-  if (contactBtn)
+  if (contactBtn) {
     contactBtn.href = r.phone ? `https://wa.me/${r.phone}` : "#";
+    contactBtn.hidden = !hasPhone;
+  }
 
-  if (locationBtn)
+  if (locationBtn) {
     locationBtn.href = r.map || "#";
+    locationBtn.hidden = !hasMap;
+  }
+
+  const ctaRow = document.querySelector(".profile-cta-row");
+  const visibleSecondary = (hasMenu ? 1 : 0) + (hasMap ? 1 : 0);
+  if (ctaRow) {
+    ctaRow.hidden = visibleSecondary === 0;
+    ctaRow.classList.toggle("is-single", visibleSecondary === 1);
+  }
+
+  const ctaBlock = document.querySelector(".profile-cta");
+  const profileLayout = document.querySelector(".profile-layout");
+  if (ctaBlock) ctaBlock.hidden = !hasPhone && visibleSecondary === 0;
+
+  /* --- Gallery + lightbox --- */
+  const gallerySection = document.querySelector(".profile-gallery");
 
   if (profileGallery) {
     profileGallery.innerHTML = "";
-    if (r.gallery && r.gallery.length > 0) {
-      r.gallery.forEach(imgUrl => {
-        if (imgUrl) {
-          const img = document.createElement("img");
-          img.src = imgUrl;
-          profileGallery.appendChild(img);
-        }
+
+    const images = (Array.isArray(r.gallery) ? r.gallery : []).filter(Boolean);
+
+    if (images.length === 0) {
+      if (gallerySection) gallerySection.hidden = true;
+      if (profileLayout) profileLayout.classList.add("is-single");
+    } else {
+      if (gallerySection) gallerySection.hidden = false;
+      if (profileLayout) profileLayout.classList.remove("is-single");
+
+      images.forEach((imgUrl, index) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "gallery-item";
+        item.setAttribute("aria-label", "عرض الصورة " + (index + 1));
+
+        const img = document.createElement("img");
+        img.src = imgUrl;
+        img.alt = (r.name || "مطعم") + " — صورة " + (index + 1);
+        img.loading = "lazy";
+        img.decoding = "async";
+
+        item.appendChild(img);
+        item.addEventListener("click", () => openLightbox(images, index));
+        profileGallery.appendChild(item);
       });
     }
   }
+}
+
+// Safety net: the profile WhatsApp CTA (kept available as a global export).
+function sendSecureOrderWhatsApp() {
+  const btn = document.getElementById("profileContactBtn");
+  const href = btn ? btn.getAttribute("href") : "";
+  if (href && href.indexOf("https://wa.me/") === 0) {
+    window.open(href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  showToast("ما في رقم واتساب مسجل لهذا المطعم.", "error");
 }
 
 function openRestaurantProfile(r) {
@@ -1879,6 +2275,8 @@ function listenToCategories() {
           return orderA - orderB;
         });
 
+        categoriesLoaded = true;
+
         allCategories.forEach(data => {
           const id = data.id;
 
@@ -1914,31 +2312,33 @@ function listenToCategories() {
               );
 
 
-            item.style.cssText =
-              "display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;";
+            item.className = "admin-row";
 
 
             item.innerHTML = `
 
-              <span>
-                ${data.order !== undefined && data.order !== null ? `<b>[${data.order}]</b> ` : ''}
-                ${data.nameAr || ""}
-                (${data.nameEn || ""})
-              </span>
+              <div class="admin-row-main">
+                <span class="admin-row-title">${data.nameAr || ""}</span>
+                <span class="admin-row-sub">${
+                  data.order !== undefined && data.order !== null
+                    ? `#${data.order} · `
+                    : ""
+                }${data.nameEn || ""}</span>
+              </div>
 
-              <div>
+              <div class="admin-row-actions">
 
                 <button
+                  class="btn btn-sm btn-ghost"
                   type="button"
-                  style="padding: 4px 8px; background: #008080; color: white; border: none; border-radius: 4px; cursor: pointer;"
                   onclick="window.editCategory('${id}', '${String(data.nameAr || "").replace(/'/g, "\\'")}', '${String(data.nameEn || "").replace(/'/g, "\\'")}', ${data.order !== undefined && data.order !== null ? data.order : 'null'}, '${String(data.imgUrl || "").replace(/'/g, "\\'")}')"
                 >
                   تعديل
                 </button>
 
                 <button
+                  class="btn btn-sm btn-danger"
                   type="button"
-                  style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;"
                   onclick="window.deleteCategoryFromFirebase('${id}')"
                 >
                   حذف
@@ -1955,6 +2355,11 @@ function listenToCategories() {
 
           }
         });
+
+        if (adminCatContainer && adminCatContainer.children.length === 0) {
+          adminCatContainer.innerHTML =
+            '<div class="admin-list-note">ما في أقسام منشورة بعد.</div>';
+        }
 
 
         filterCategories();
@@ -2038,10 +2443,6 @@ function listenToRestaurants() {
                 );
 
 
-              item.style.cssText =
-                "display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;";
-
-
               const restaurantObject = {
                 id: id,
                 category: data.category || "",
@@ -2070,25 +2471,44 @@ function listenToRestaurants() {
                 );
 
 
+              const matchedCategory = allCategories.find(
+                c => c.id === (data.category || "")
+              );
+
+              const categoryLabel = matchedCategory
+                ? matchedCategory.nameAr || matchedCategory.nameEn || ""
+                : "";
+
+              const metaLabel = [
+                categoryLabel,
+                `${data.openTime || "11:00"} – ${data.closeTime || "02:00"}`
+              ]
+                .filter(Boolean)
+                .join(" · ");
+
+
+              item.className = "admin-row";
+
               item.innerHTML = `
 
-                <span>
-                  ${data.name || ""}
-                </span>
+                <div class="admin-row-main">
+                  <span class="admin-row-title">${data.name || ""}</span>
+                  <span class="admin-row-sub">${metaLabel}</span>
+                </div>
 
-                <div>
+                <div class="admin-row-actions">
 
                   <button
+                    class="btn btn-sm btn-ghost"
                     type="button"
-                    style="padding: 4px 8px; background: #008080; color: white; border: none; border-radius: 4px; cursor: pointer;"
                     onclick="window.editRestaurant(${objectString})"
                   >
                     تعديل
                   </button>
 
                   <button
+                    class="btn btn-sm btn-danger"
                     type="button"
-                    style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;"
                     onclick="window.deleteRestaurantFromFirebase('${id}')"
                   >
                     حذف
@@ -2108,12 +2528,19 @@ function listenToRestaurants() {
           }
         );
 
+        restaurantsLoaded = true;
+
+        if (adminRestContainer && adminRestContainer.children.length === 0) {
+          adminRestContainer.innerHTML =
+            '<div class="admin-list-note">ما في مطاعم منشورة بعد.</div>';
+        }
+
 
         if (currentCategoryFilter) {
           // إعادة ملء معلومات الهيرو المخصصة للقسم في الصفحة الثالثة إذا تمت إعادتها بعد الـ Refresh
           const heroTitle = document.getElementById("categoryHeroTitle");
           const heroImg = document.getElementById("categoryHeroImg");
-          if (heroTitle) heroTitle.innerText = localStorage.getItem("currentCategoryName") || "";
+          if (heroTitle) heroTitle.innerText = localStorage.getItem("currentCategoryName") || "المطاعم";
           if (heroImg) heroImg.src = localStorage.getItem("currentCategoryImg") || "https://via.placeholder.com/400x150";
 
           renderRestaurantsList("", true);
@@ -2279,7 +2706,7 @@ function editRestaurant(
   if (formTitle)
 
     formTitle.innerText =
-      "Edit Restaurant";
+      "تعديل المطعم";
 
   const coverFile =
     document.getElementById("adminCoverFile");
@@ -2811,6 +3238,112 @@ window.openRestaurantProfile =
 
 window.editRestaurant =
   editRestaurant;
+
+window.sendSecureOrderWhatsApp =
+  sendSecureOrderWhatsApp;
+
+window.showToast =
+  showToast;
+
+window.showConfirm =
+  showConfirm;
+
+
+// ============================================================
+// DESIGN SYSTEM WIRING (presentation only)
+// ============================================================
+
+function wireSearchField(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const wrap = input.closest(".search-field");
+  if (!wrap) return;
+
+  const clear = wrap.querySelector(".search-clear");
+
+  const sync = () => {
+    wrap.classList.toggle("has-value", input.value.length > 0);
+  };
+
+  input.addEventListener("input", sync);
+
+  if (clear) {
+    clear.addEventListener("click", () => {
+      input.value = "";
+      sync();
+      input.focus();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  sync();
+}
+
+function initDesignSystem() {
+  wireSearchField("categoriesSearchInput");
+  wireSearchField("restaurantsSearchInput");
+
+  /* --- Lightbox controls --- */
+  const lightbox = document.getElementById("lightbox");
+  const closeBtn = document.getElementById("lightboxClose");
+  const prevBtn = document.getElementById("lightboxPrev");
+  const nextBtn = document.getElementById("lightboxNext");
+
+  if (closeBtn) closeBtn.addEventListener("click", closeLightbox);
+  if (prevBtn) prevBtn.addEventListener("click", () => stepLightbox(-1));
+  if (nextBtn) nextBtn.addEventListener("click", () => stepLightbox(1));
+
+  if (lightbox) {
+    lightbox.addEventListener("click", event => {
+      if (event.target === lightbox) closeLightbox();
+    });
+  }
+
+  document.addEventListener("keydown", event => {
+    const open = document.getElementById("lightbox");
+    if (open && !open.hidden) {
+      if (event.key === "Escape") closeLightbox();
+      if (event.key === "ArrowLeft") stepLightbox(1);
+      if (event.key === "ArrowRight") stepLightbox(-1);
+      return;
+    }
+    if (event.key === "Escape") {
+      const guide = document.getElementById("iosGuideModal");
+      if (guide && guide.style.display === "flex" && typeof closeIosGuide === "function") {
+        closeIosGuide();
+      }
+      const pwa = document.getElementById("pwaModal");
+      if (pwa && pwa.style.display === "flex") pwa.style.display = "none";
+    }
+  });
+
+  /* --- Loading skeletons until the first Firestore snapshot --- */
+  if (!categoriesLoaded) renderCategorySkeleton();
+  if (!restaurantsLoaded && currentCategoryFilter) renderRestaurantSkeleton();
+
+  /* --- If Firestore never answers (offline), swap skeletons for a real
+         error state instead of an endless shimmer --- */
+  setTimeout(function () {
+    const grid = document.getElementById("categoriesGridContainer");
+    if (!categoriesLoaded && grid && !grid.querySelector(".category-card")) {
+      grid.innerHTML = emptyStateHtml(
+        "تعذّر تحميل الأقسام",
+        "تحقّق من اتصالك بالإنترنت ثم أعد تحميل الصفحة."
+      );
+    }
+
+    const list = document.getElementById("restaurantsListContainer");
+    if (!restaurantsLoaded && list && !list.querySelector(".restaurant-card")) {
+      list.innerHTML = emptyStateHtml(
+        "تعذّر تحميل المطاعم",
+        "تحقّق من اتصالك بالإنترنت ثم أعد تحميل الصفحة."
+      );
+    }
+  }, 9000);
+}
+
+window.addEventListener("DOMContentLoaded", initDesignSystem);
 window.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('install') === 'true') {
