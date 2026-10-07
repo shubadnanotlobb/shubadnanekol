@@ -85,10 +85,27 @@
   --sh-2: 0 10px 30px rgba(0, 0, 0, 0.45);
   --sh-fab: 0 6px 20px rgba(0, 0, 0, 0.5);
 
-  /* Motion */
+  /* Motion — legacy tokens (kept for existing rules) */
   --dur: 150ms;
   --dur-2: 220ms;
+  --dur-3: 200ms;
+  --dur-4: 400ms;
   --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Motion — scale (the system every new rule uses) */
+  --m-instant: 90ms; /* press / release / haptic */
+  --m-fast: 150ms; /* chips, focus, hover, clear */
+  --m-base: 220ms; /* micro entrance, back navigation */
+  --m-page: 260ms; /* page enter */
+  --m-slow: 420ms; /* card entrance, photo develop, reveals */
+  --m-morph: 560ms; /* shared-element photo morph */
+  --m-moment: 900ms; /* category food moment (hard cap) */
+  --m-stagger: 32ms; /* list cadence, max 6 items */
+
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1); /* entrances, morphs */
+  --e-inout: cubic-bezier(0.65, 0, 0.35, 1); /* exits, scene dissolve */
+  --e-spring: cubic-bezier(0.34, 1.4, 0.5, 1); /* one-shots only */
 
   /* Layout */
   --bar-h: 56px;
@@ -190,6 +207,17 @@ p {
   visibility: hidden;
 }
 
+/* Photo develop: images start soft and resolve once decoded. Only images the
+   JS layer renders carry this class, so a no-JS page keeps its artwork. */
+.fade-img {
+  opacity: 0;
+  transition: opacity var(--dur-4) var(--ease-out);
+}
+
+.fade-img.is-loaded {
+  opacity: 1;
+}
+
 /* --------------------------------------------------------------------------
    3. SHELL / LAYOUT
    -------------------------------------------------------------------------- */
@@ -205,6 +233,20 @@ p {
 
 .view-page.active {
   display: block;
+  /* Page transition: opacity + travel. The animation restarts on every
+     display toggle, so back-navigation can invert the direction. */
+  animation: page-in var(--m-page) var(--e-out) backwards;
+}
+
+.view-page.active.is-back {
+  animation-name: page-in-back;
+  animation-duration: var(--m-base);
+}
+
+/* While a View Transition morphs a photo, the entering page must not also
+   fade in on top of it (double motion). */
+html.vt-running .view-page.active {
+  animation: none;
 }
 
 /* --- App bar ------------------------------------------------------------ */
@@ -302,6 +344,8 @@ p {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 4px;
   gap: var(--sp-3);
   margin-bottom: var(--sp-4);
 }
@@ -315,6 +359,7 @@ p {
 .section-sub {
   font-size: var(--t-xs);
   color: var(--text-3);
+  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -499,6 +544,20 @@ p {
   flex: 0 0 auto;
   line-height: 1;
   white-space: nowrap;
+  /* Always reads ★5 — mark first, value second — whatever the page
+     direction is. isolate keeps it from bleeding into surrounding RTL. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.rating-star {
+  color: #f0b429;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.rating--sm .rating-star {
+  font-size: 12px;
 }
 
 .rating-stars {
@@ -521,6 +580,21 @@ p {
   color: #f0b429;
   letter-spacing: 1.5px;
   pointer-events: none;
+  /* Width comes from --fill (set in markup); the sweep itself is a pure
+     transform so it stays on the compositor. Grows from the inline-start
+     edge — right in RTL, left in LTR. */
+  width: var(--fill, 0%);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--m-slow) var(--e-out);
+}
+
+[dir="ltr"] .rating-stars-fill {
+  transform-origin: left center;
+}
+
+.rating.is-shown .rating-stars-fill {
+  transform: scaleX(1);
 }
 
 .rating-value {
@@ -540,6 +614,7 @@ p {
 
 /* --- Favourite (heart) -------------------------------------------------- */
 .fav-btn {
+  position: relative;
   width: 44px;
   height: 44px;
   display: inline-grid;
@@ -577,6 +652,21 @@ p {
 .fav-btn.is-active svg {
   fill: currentColor;
   stroke: currentColor;
+}
+
+/* One-shot confirmation when the heart is toggled (added/removed by JS). */
+.fav-btn.is-pop {
+  animation: fav-pop var(--dur-4) var(--ease-out);
+}
+
+.fav-btn.is-pop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  pointer-events: none;
+  animation: fav-ring 420ms var(--ease-out) forwards;
 }
 
 /* On top of card artwork: a soft scrim keeps it legible without
@@ -838,14 +928,80 @@ textarea.field-control {
   border-radius: var(--r-sm);
 }
 
+/* Skeletons mirror the real card geometry (cover ratio + body padding) so the
+   list does not jump when Firestore answers. */
+.skel-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.skel-media {
+  width: 100%;
+  border-radius: 0;
+  flex: 0 0 auto;
+}
+
+.skel-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.skel-line {
+  height: 11px;
+  border-radius: var(--r-pill);
+}
+
+.skel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skel-chip {
+  width: 62px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  flex: 0 0 auto;
+}
+
+.skel-rating {
+  width: 52px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  flex: 0 0 auto;
+}
+
+/* --- Restaurant card skeleton ------------------------------------------ */
+.skel-rc .skel-media {
+  aspect-ratio: 16 / 9;
+}
+
+.skel-rc .skel-body {
+  padding: var(--sp-4);
+  gap: 10px;
+  min-height: 132px;
+}
+
+.skel-rc .skel-meta {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* --- Category card skeleton -------------------------------------------- */
 .skel-cat {
-  height: 150px;
   border-radius: var(--r-md);
 }
 
-.skel-rc {
-  height: 240px;
-  border-radius: var(--r-lg);
+.skel-cat .skel-media {
+  aspect-ratio: 4 / 3;
+}
+
+.skel-cat .skel-body {
+  padding: 11px 12px 12px;
+  gap: 7px;
 }
 
 .empty {
@@ -858,8 +1014,8 @@ textarea.field-control {
 }
 
 .empty-mark {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   margin: 0 auto var(--sp-3);
   display: grid;
   place-items: center;
@@ -869,8 +1025,8 @@ textarea.field-control {
 }
 
 .empty-mark svg {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 .empty-title {
@@ -884,6 +1040,14 @@ textarea.field-control {
   color: var(--text-2);
   max-width: 34ch;
   margin-inline: auto;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
 }
 
 /* --------------------------------------------------------------------------
@@ -1230,6 +1394,17 @@ body.is-home .appbar-title {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform var(--dur-3) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .category-card:hover .cat-media img {
+    transform: scale(1.04);
+  }
+}
+
+.category-card:active .cat-media img {
+  transform: scale(1.04);
 }
 
 .cat-body {
@@ -1344,7 +1519,7 @@ body.is-home .appbar-title {
 }
 
 .restaurant-card:active {
-  transform: scale(0.99);
+  transform: scale(0.985);
 }
 
 .rc-media {
@@ -1355,11 +1530,38 @@ body.is-home .appbar-title {
   overflow: hidden;
 }
 
+/* Monoline cutlery sits under the photo: it is the pre-load placeholder and,
+   if the image never loads, the broken-image fallback. */
+.rc-media::before,
+.cat-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: center / 46px 46px no-repeat
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a6b0ad' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'><path d='M4 3v5a2 2 0 0 0 4 0V3'/><path d='M6 3v5'/><path d='M6 10v11'/><path d='M18 21V3'/><path d='M18 3c-2.2 1.2-3.4 3.4-3.4 5.8S16.4 12.6 18 13'/></svg>");
+  opacity: 0.16;
+  pointer-events: none;
+}
+
 .rc-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity var(--dur-2) var(--ease);
+  transition: opacity var(--dur-4) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
+  will-change: transform;
+}
+
+/* The photo is the interaction: a small zoom on hover (pointer devices only)
+   and on press. Never a scale-up of the whole card. */
+@media (hover: hover) {
+  .restaurant-card:hover .rc-cover {
+    transform: scale(1.03);
+  }
+}
+
+.restaurant-card:active .rc-cover {
+  transform: scale(1.03);
 }
 
 .rc-media.is-brand {
@@ -1503,32 +1705,94 @@ body.is-home .appbar-title {
   background: var(--surface-2);
   border: 1px solid var(--line);
   margin-bottom: var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .profile-cover img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+/* No cover photo → the image drops out and the flat panel holds the frame. */
+.profile-cover.is-empty img {
+  display: none;
+}
+
+/* The photo stays the hero, so save + rating share one frosted chip in the
+   corner instead of making the picture carry a scrim. Tucked opposite the
+   back arrow so the two controls never compete. */
+.cover-actions {
+  position: absolute;
+  inset-block-start: 12px;
+  /* Physical `left`, not a logical inset: the chip carries direction:ltr for
+     its own contents, which would otherwise flip this to the right edge and
+     stack it under the back arrow. */
+  left: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  /* Heart first, then ★5 — reads the same in every language. */
+  direction: ltr;
+  border-radius: 999px;
+  background: rgba(6, 16, 14, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.fav-btn--cover {
+  width: 34px;
+  height: 34px;
+}
+
+.fav-btn--cover:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Rating sits on the photo, so it reads in white, not page ink. */
+.cover-actions .profile-rating {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 3px 9px;
+}
+
+.cover-actions .rating-star {
+  font-size: 14px;
+}
+
+.cover-actions .rating-value {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .profile-head {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--sp-3);
   padding-bottom: var(--sp-5);
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--sp-5);
 }
 
+/* Small disc, sitting below the cover — never on top of the photo. */
 .profile-logo {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   flex: 0 0 auto;
   border-radius: 50%;
   overflow: hidden;
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
 }
 
 /* Logos often ship with white padding around the artwork — the zoom
@@ -1545,6 +1809,7 @@ body.is-home .appbar-title {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  text-align: center;
   overflow-wrap: anywhere;
 }
 
@@ -1553,18 +1818,21 @@ body.is-home .appbar-title {
   color: var(--text-2);
   margin-top: var(--sp-2);
   line-height: 1.65;
+  text-align: center;
   overflow-wrap: anywhere;
 }
 
 .profile-identity {
   min-width: 0;
+  width: 100%;
 }
 
 .profile-badges {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--sp-2);
   margin-bottom: 8px;
 }
 
@@ -2262,13 +2530,892 @@ body.no-scroll {
   }
 }
 
+/* Page change: opacity + travel. `backwards` so the final frame is dropped
+   and press states keep working afterwards. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes page-in-back {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Card entrance: first six cards only, 24ms apart, set by --i in JS. */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.stagger-in {
+  animation: card-in var(--m-slow) var(--e-out) backwards;
+  animation-delay: calc(var(--i, 0) * var(--m-stagger));
+}
+
+@keyframes fav-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fav-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+/* View Transitions: the tapped photo travels into the hero/cover, everything
+   else crossfades fast underneath. */
+::view-transition-group(*) {
+  animation-duration: var(--dur-4);
+  animation-timing-function: var(--ease-out);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 140ms;
+}
+
+/* ==========================================================================
+   MOTION SYSTEM v2 — reveals, launch splash, home rail, category food moments
+   ========================================================================== */
+
+/* --- App-bar title crossfade (toggled by showPage) ---------------------- */
+.appbar-title.is-swap {
+  animation: title-swap var(--m-base) var(--e-out) both;
+}
+
+@keyframes title-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* --- Scroll / entrance reveals (added + observed by JS) ------------------ */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.reveal.is-in {
+  animation: reveal-in var(--m-slow) var(--e-out) both;
+  animation-delay: calc(var(--ri, 0) * 70ms);
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Home launch choreography (body.is-entering, removed after ~1.4s) ---- */
+#pageHome .masthead {
+  --ha: 1;
+}
+#pageHome .home-top {
+  --ha: 2;
+}
+#pageHome .home-cats {
+  --ha: 3;
+}
+#pageHome .install {
+  --ha: 4;
+}
+
+body.is-entering #pageHome .masthead,
+body.is-entering #pageHome .home-top,
+body.is-entering #pageHome .home-cats,
+body.is-entering #pageHome .install {
+  animation: rise-in 560ms var(--e-out) backwards;
+  animation-delay: calc(var(--ha, 0) * 90ms);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+/* --- Launch splash ------------------------------------------------------ */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sp-5);
+  background: var(--bg);
+  text-align: center;
+  padding: var(--sp-6);
+}
+
+.splash-mark {
+  position: relative;
+  width: 108px;
+  height: 108px;
+}
+
+.splash-rim {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 154px;
+  height: 154px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  fill: none;
+  stroke: var(--glow-ring);
+  stroke-width: 1.4;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: rim-draw 700ms var(--e-out) 80ms both;
+}
+
+@keyframes rim-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.splash-logo {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  border-radius: 30px;
+  overflow: hidden;
+  background: #000;
+  border: 2px solid var(--glow-ring);
+  box-shadow: 0 0 0 3px rgba(4, 10, 18, 0.65), 0 0 26px 6px var(--glow-halo);
+  animation: splash-mark-in 560ms var(--e-out) 60ms both;
+}
+
+@keyframes splash-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+.splash-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.18);
+}
+
+/* one shot of light across the mark */
+.splash-gleam {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 68%
+  );
+  transform: translateX(-140%);
+  animation: gleam 540ms var(--e-out) 360ms both;
+  pointer-events: none;
+}
+
+@keyframes gleam {
+  to {
+    transform: translateX(140%);
+  }
+}
+
+.splash-word {
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  white-space: nowrap;
+  animation: splash-word 600ms var(--e-out) 280ms both;
+}
+
+.splash-word span {
+  color: var(--accent-2);
+}
+
+@keyframes splash-word {
+  from {
+    opacity: 0;
+    letter-spacing: 0.32em;
+    transform: translateY(6px);
+  }
+}
+
+.splash-tag {
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  animation: fade-in 440ms var(--e-out) 420ms both;
+}
+
+.splash.is-leaving {
+  animation: splash-out 380ms var(--e-inout) both;
+}
+
+@keyframes splash-out {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+/* --- Home: broken hero image falls back to the brand mark --------------- */
+.region-img.is-broken {
+  display: none;
+}
+
+.region-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: center / 72px 72px no-repeat
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a6b0ad' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'><path d='M4 3v5a2 2 0 0 0 4 0V3'/><path d='M6 3v5'/><path d='M6 10v11'/><path d='M18 21V3'/><path d='M18 3c-2.2 1.2-3.4 3.4-3.4 5.8S16.4 12.6 18 13'/></svg>");
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+/* --- Home: category rail (food discovery above the fold) ---------------- */
+.home-cats {
+  margin-bottom: var(--sp-6);
+}
+
+.home-cats .section-head {
+  margin-bottom: var(--sp-3);
+}
+
+.home-cats-rail {
+  display: flex;
+  gap: var(--sp-3);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  margin-inline: calc(var(--pad) * -1);
+  padding-inline: var(--pad);
+}
+
+.home-cats-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.homecat {
+  position: relative;
+  flex: 0 0 auto;
+  width: 126px;
+  padding: 0;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  scroll-snap-align: start;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  text-align: start;
+  cursor: pointer;
+  transition: transform var(--m-fast) var(--e-out),
+    border-color var(--m-fast) var(--ease);
+}
+
+.homecat:active {
+  transform: scale(0.97);
+}
+
+.homecat-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.homecat-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: center / 40px 40px no-repeat
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a6b0ad' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'><path d='M4 3v5a2 2 0 0 0 4 0V3'/><path d='M6 3v5'/><path d='M6 10v11'/><path d='M18 21V3'/><path d='M18 3c-2.2 1.2-3.4 3.4-3.4 5.8S16.4 12.6 18 13'/></svg>");
+  opacity: 0.18;
+}
+
+.homecat-media img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--m-base) var(--e-out);
+}
+
+.homecat-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(4, 8, 12, 0.94) 6%,
+    rgba(4, 8, 12, 0.45) 42%,
+    transparent 72%
+  );
+}
+
+@media (hover: hover) {
+  .homecat:hover .homecat-media img {
+    transform: scale(1.05);
+  }
+}
+
+.homecat-copy {
+  position: absolute;
+  inset-inline: 10px;
+  bottom: 9px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.homecat-name {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.homecat-en {
+  font-size: var(--t-2xs);
+  color: rgba(255, 255, 255, 0.66);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* sits on the far end of the row so the fixed WhatsApp button never lands
+   on top of it */
+.home-saved-empty {
+  margin-top: var(--sp-3);
+  font-size: var(--t-xs);
+  line-height: 1.75;
+  color: var(--text-3);
+}
+
+.home-cats-more {
+  display: flex;
+  width: fit-content;
+  margin-inline-start: auto;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--sp-3);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--accent-2);
+  background: none;
+  border: 0;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.home-cats-more svg {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--m-fast) var(--e-out);
+}
+
+.home-cats-more:active svg {
+  transform: translateX(-4px);
+}
+
+/* ==========================================================================
+   CATEGORY FOOD MOMENT — the signature scene
+   ========================================================================== */
+.moment {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  --moment-dur: 900ms;
+}
+
+.moment.is-short {
+  --moment-dur: 520ms;
+}
+
+.moment-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.9);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
+  animation: scrim-life var(--moment-dur) linear both;
+}
+
+@keyframes scrim-life {
+  0%,
+  76% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.moment-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 42%,
+    var(--food-soft) 0%,
+    transparent 64%
+  );
+  animation: veil-life var(--moment-dur) var(--e-out) both;
+}
+
+@keyframes veil-life {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  24% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  66% {
+    opacity: 0.7;
+    transform: scale(1.04);
+  }
+  80% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+/* the real category photograph, flown out of the tapped card. It keeps full
+   opacity for the whole scene — the artwork's plate covers it while the
+   illustration performs, so the reveal is a clean dissolve. */
+.moment-disc {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: min(56vw, 236px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: 2;
+  background: var(--surface-2);
+  box-shadow: 0 34px 70px rgba(0, 0, 0, 0.62);
+  opacity: 1;
+}
+
+.moment-disc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.moment-disc::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  border: 1.5px solid var(--food);
+  opacity: 0.6;
+  animation: rim-in calc(var(--moment-dur) * 0.578) var(--e-out) 34% both;
+}
+
+@keyframes rim-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+}
+
+/* Landing: the accent rim and the cinematic shadow stand down so the photo
+   settles onto the hero thumbnail with nothing left over it. */
+.moment.is-docking .moment-disc::after {
+  animation: none;
+  opacity: 0;
+  transition: opacity 200ms linear;
+}
+
+/* the drawn food — owns the scene until the photograph takes over */
+.moment-art {
+  position: absolute;
+  inset-inline: 0;
+  top: 44%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  color: var(--food);
+}
+
+/* The plate is opaque almost immediately — long before the photograph lands
+   — so the two never ghost through each other. It then dissolves on exactly
+   the same beat as the drawing, handing the scene back to the photo. */
+.moment-art::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: calc(min(56vw, 236px) + 6px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(6, 10, 9, 0.985);
+  box-shadow: 0 0 44px 14px rgba(6, 10, 9, 0.55);
+  animation: plate-life var(--moment-dur) linear both;
+}
+
+@keyframes plate-life {
+  0% {
+    opacity: 0;
+  }
+  9%,
+  64% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.moment-art svg {
+  position: relative;
+  width: min(64vw, 264px);
+  height: min(64vw, 264px);
+  overflow: visible;
+  animation: art-pop var(--moment-dur) var(--e-out) both,
+    art-life var(--moment-dur) linear both;
+}
+
+@keyframes art-life {
+  0%,
+  8% {
+    opacity: 0;
+  }
+  20%,
+  64% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes art-pop {
+  0%,
+  10% {
+    transform: scale(0.84) rotate(-8deg);
+  }
+  40% {
+    transform: scale(1) rotate(1.2deg);
+  }
+  52% {
+    transform: scale(1) rotate(0deg);
+  }
+  100% {
+    transform: scale(1.03) rotate(0deg);
+  }
+}
+
+.moment-title {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 0;
+  top: calc(44% + min(31vw, 132px) + 30px);
+  padding-inline: var(--sp-6);
+  text-align: center;
+  animation: title-life var(--moment-dur) var(--e-out) both;
+}
+
+@keyframes title-life {
+  0%,
+  28% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  46%,
+  82% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.moment-title-ar {
+  display: block;
+  font-size: clamp(25px, 8vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.moment-title-en {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--t-2xs);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.moment.is-skip .moment-scrim,
+.moment.is-skip .moment-veil,
+.moment.is-skip .moment-art,
+.moment.is-skip .moment-title,
+.moment.is-skip .moment-disc {
+  animation: none;
+  opacity: 0;
+  transition: opacity 140ms linear;
+}
+
+/* --- Food illustration: roles shared by every artwork ------------------- */
+.fa {
+  overflow: visible;
+}
+
+.fa .o {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.4;
+}
+.fa .n {
+  fill: none;
+  stroke: rgba(246, 248, 247, 0.5);
+  stroke-width: 3;
+}
+.fa .of {
+  fill: currentColor;
+  fill-opacity: 0.16;
+  stroke: currentColor;
+  stroke-width: 3.4;
+}
+.fa .f {
+  fill: currentColor;
+  fill-opacity: 0.16;
+}
+.fa .f2 {
+  fill: currentColor;
+  fill-opacity: 0.36;
+}
+.fa .d {
+  fill: currentColor;
+  fill-opacity: 0.5;
+}
+.fa .s {
+  fill: currentColor;
+}
+.fa .w {
+  fill: #f4f7f6;
+  fill-opacity: 0.92;
+}
+.fa .sh {
+  fill: rgba(0, 0, 0, 0.5);
+}
+.fa .o,
+.fa .n,
+.fa .of {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Every art timing is a fraction of --moment-dur, so the illustration and the
+   scene it lives in can never drift apart. (Base scene = 900ms.)
+   Everything must be fully assembled by ~54% of the scene — the last 20% is
+   reserved for dissolving the drawing away and handing over to the photo. */
+
+/* stepped rise — the workhorse (index via inline --si) */
+.moment-art .fa-step {
+  animation: fa-rise calc(var(--moment-dur) * 0.3) var(--e-out) both;
+  animation-delay: calc(
+    var(--moment-dur) * (0.11 + var(--si, 0) * 0.048)
+  );
+}
+
+@keyframes fa-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+/* horizontal arrival (RTL: enters from the right) */
+.moment-art .fa-slide {
+  animation: fa-slide calc(var(--moment-dur) * 0.3) var(--e-out) both;
+  animation-delay: calc(
+    var(--moment-dur) * (0.12 + var(--si, 0) * 0.052)
+  );
+}
+
+@keyframes fa-slide {
+  from {
+    opacity: 0;
+    transform: translateX(34px);
+  }
+}
+
+/* small detail popping last
+   (fill-box: without it the scale resolves against the viewBox origin and
+   every detail flies in from a diagonal instead of popping where it sits) */
+.moment-art .fa-pop {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: fa-pop calc(var(--moment-dur) * 0.24) var(--e-out) both;
+  animation-delay: calc(
+    var(--moment-dur) * (0.22 + var(--si, 0) * 0.042)
+  );
+}
+
+@keyframes fa-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+/* outline drawing itself */
+.moment-art .fa-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fa-draw calc(var(--moment-dur) * 0.36) var(--e-out)
+    calc(var(--moment-dur) * 0.1) both;
+}
+
+@keyframes fa-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* wash of colour fading in behind an outline */
+.moment-art .fa-shade {
+  animation: fa-shade calc(var(--moment-dur) * 0.3) var(--e-out)
+    calc(var(--moment-dur) * 0.13) both;
+}
+
+@keyframes fa-shade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* liquid rising in a glass / cup */
+.moment-art .fa-liquid {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: fa-fill calc(var(--moment-dur) * 0.33) var(--e-out)
+    calc(var(--moment-dur) * 0.15) both;
+}
+
+@keyframes fa-fill {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* whole-body settle for a single hero shape — rotates about its own centre,
+   never about the corner of the drawing */
+.moment-art .fa-tilt {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: fa-tilt calc(var(--moment-dur) * 0.36) var(--e-out)
+    calc(var(--moment-dur) * 0.1) both;
+}
+
+@keyframes fa-tilt {
+  from {
+    opacity: 0;
+    transform: rotate(-7deg) translateY(-8px);
+  }
+  60% {
+    transform: rotate(1.6deg) translateY(0);
+  }
+}
+
+/* pizza: the slice lifts out and stays slightly proud */
+.moment-art .fa-wedge {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: fa-wedge calc(var(--moment-dur) * 0.33) var(--e-out)
+    calc(var(--moment-dur) * 0.15) both;
+}
+
+@keyframes fa-wedge {
+  from {
+    opacity: 0;
+    transform: none;
+  }
+  45% {
+    opacity: 1;
+    transform: translate(12px, -10px) rotate(5deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(7px, -6px) rotate(3deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* without this, `backwards` fills keep staggered cards at opacity 0 for
+       their full delay and they still pop in one by one */
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -2321,13 +3468,12 @@ body.no-scroll {
   }
 
   .profile-head {
-    flex-direction: row;
     align-items: center;
   }
 
   .profile-logo {
-    width: 88px;
-    height: 88px;
+    width: 72px;
+    height: 72px;
   }
 
   .profile-cover {

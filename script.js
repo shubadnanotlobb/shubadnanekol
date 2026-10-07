@@ -51,6 +51,10 @@ let allCategories = [];
 // Design-system state: are the Firestore snapshots in yet?
 let categoriesLoaded = false;
 let restaurantsLoaded = false;
+let categoriesLoadFailed = false;
+let restaurantsLoadFailed = false;
+let unsubscribeCategories = null;
+let unsubscribeRestaurants = null;
 
 
 // ============================================================
@@ -216,16 +220,43 @@ function stepLightbox(delta) {
 }
 
 /* --- List states (skeleton / empty) ----------------------------------- */
-function emptyStateHtml(title, text) {
+/* One monoline food mark for every empty state: cutlery, never a cartoon. */
+const EMPTY_MARK_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M4 3v5a2 2 0 0 0 4 0V3"/>' +
+    '<path d="M6 3v5"/>' +
+    '<path d="M6 10v11"/>' +
+    '<path d="M18 21V3"/>' +
+    '<path d="M18 3c-2.2 1.2-3.4 3.4-3.4 5.8S16.4 12.6 18 13"/>' +
+  "</svg>";
+
+const EMPTY_ACTIONS = {
+  browse: { label: "تصفح كل الأقسام", cls: "btn-primary" },
+  clear: { label: "امسح البحث", cls: "btn-ghost" },
+  retry: { label: "إعادة المحاولة", cls: "btn-ghost" }
+};
+
+/**
+ * @param {string} title
+ * @param {string} text
+ * @param {string[]} [actions] keys of EMPTY_ACTIONS to render as CTAs
+ */
+function emptyStateHtml(title, text, actions) {
+  let buttons = "";
+  (actions || []).forEach(key => {
+    const action = EMPTY_ACTIONS[key];
+    if (!action) return;
+    buttons +=
+      '<button type="button" class="btn btn-sm ' + action.cls +
+      '" data-empty-action="' + key + '">' + action.label + "</button>";
+  });
+
   return (
-    '<div class="empty">' +
-      '<div class="empty-mark">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/>' +
-        "</svg>" +
-      "</div>" +
+    '<div class="empty" role="status">' +
+      '<div class="empty-mark">' + EMPTY_MARK_SVG + "</div>" +
       '<div class="empty-title">' + title + "</div>" +
       '<div class="empty-text">' + text + "</div>" +
+      (buttons ? '<div class="empty-actions">' + buttons + "</div>" : "") +
     "</div>"
   );
 }
@@ -234,25 +265,65 @@ function renderCategorySkeleton() {
   const grid = document.getElementById("categoriesGridContainer");
   if (!grid) return;
   let html = "";
-  for (let i = 0; i < 6; i++) html += '<div class="skel skel-cat"></div>';
+  for (let i = 0; i < 6; i++) {
+    html +=
+      '<div class="skel-card skel-cat">' +
+        '<div class="skel skel-media"></div>' +
+        '<div class="skel-body">' +
+          '<div class="skel skel-line" style="width:72%"></div>' +
+          '<div class="skel skel-line" style="width:44%"></div>' +
+        "</div>" +
+      "</div>";
+  }
   grid.innerHTML = html;
 }
 
+/* Mirrors the real card: 16:9 cover + status/rating row + two text lines +
+   the meta strip. Same padding, so the list does not jump when data lands. */
 function renderRestaurantSkeleton() {
   const box = document.getElementById("restaurantsListContainer");
   if (!box) return;
   let html = "";
-  for (let i = 0; i < 3; i++) html += '<div class="skel skel-rc"></div>';
+  for (let i = 0; i < 3; i++) {
+    html +=
+      '<div class="skel-card skel-rc">' +
+        '<div class="skel skel-media"></div>' +
+        '<div class="skel-body">' +
+          '<div class="skel-row">' +
+            '<div class="skel skel-chip"></div>' +
+            '<div class="skel skel-rating"></div>' +
+          "</div>" +
+          '<div class="skel skel-line" style="width:84%"></div>' +
+          '<div class="skel skel-line" style="width:56%"></div>' +
+          '<div class="skel-meta"><div class="skel skel-line" style="width:48%"></div></div>' +
+        "</div>" +
+      "</div>";
+  }
   box.innerHTML = html;
 }
 
-/* --- Broken-image fallback ------------------------------------------- */
+/* --- Image loading: photo develop + broken-image fallback --------------- */
+function markImageLoaded(img) {
+  if (!img || img.tagName !== "IMG") return;
+  img.classList.remove("is-broken");
+  if (img.naturalWidth > 0) img.classList.add("is-loaded");
+}
+
+/* Images already in the cache finish before any listener can see them. */
+function sweepImages(root) {
+  const scope = root || document;
+  scope.querySelectorAll("img").forEach(img => {
+    if (img.complete) markImageLoaded(img);
+  });
+}
+
 document.addEventListener(
   "error",
   event => {
     const target = event.target;
     if (target && target.tagName === "IMG" && target.getAttribute("src")) {
       target.classList.add("is-broken");
+      target.classList.remove("is-loaded");
     }
   },
   true
@@ -262,7 +333,7 @@ document.addEventListener(
   "load",
   event => {
     const target = event.target;
-    if (target && target.tagName === "IMG") target.classList.remove("is-broken");
+    if (target && target.tagName === "IMG") markImageLoaded(target);
   },
   true
 );
@@ -279,6 +350,258 @@ function makeCardInteractive(el, handler) {
     if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
       event.preventDefault();
       handler(event);
+    }
+  });
+}
+
+// ============================================================
+// MOTION HELPERS (View Transitions, photo develop, one-shot feedback)
+// ============================================================
+
+function prefersReducedMotion() {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+/** Drops the old frame so a new photo develops from its placeholder. */
+function setImgSrc(img, src) {
+  if (!img) return;
+  const next = src || "";
+  const current = img.getAttribute("src") || "";
+  if (current === next) {
+    markImageLoaded(img);
+    return;
+  }
+  img.classList.remove("is-loaded", "is-broken");
+  if (next) img.setAttribute("src", next);
+  else img.removeAttribute("src");
+  if (img.complete) requestAnimationFrame(() => markImageLoaded(img));
+}
+
+function decodeImage(src) {
+  if (!src) return Promise.resolve();
+  const img = new Image();
+  img.src = src;
+  if (typeof img.decode === "function") {
+    return img.decode().catch(() => {});
+  }
+  return new Promise(resolve => {
+    img.onload = img.onerror = resolve;
+    setTimeout(resolve, 400);
+  });
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(resolve, ms))
+  ]);
+}
+
+/**
+ * Runs `mutate` inside a View Transition so the photo that was tapped travels
+ * into the destination photo. Without support (or with reduced motion) this is
+ * just the mutation — the CSS page transition takes over.
+ *
+ * @param {HTMLImageElement|null} sourceImg tapped photo
+ * @param {HTMLImageElement|null} targetImg photo it travels into
+ * @param {string} decodeSrc URL the destination photo will use; the hold lasts
+ *   only as long as that real decode needs
+ * @param {Function} mutate DOM work (page switch)
+ */
+function runViewTransition(sourceImg, targetImg, decodeSrc, mutate) {
+  if (typeof document.startViewTransition !== "function" || prefersReducedMotion()) {
+    mutate();
+    return;
+  }
+
+  const NAME = "food-photo";
+  if (sourceImg) sourceImg.style.viewTransitionName = NAME;
+
+  let transition;
+  try {
+    transition = document.startViewTransition(async () => {
+      if (sourceImg) sourceImg.style.viewTransitionName = "";
+      // Never an artificial delay: only until the photo is actually decodable.
+      await withTimeout(decodeImage(decodeSrc), 200);
+      mutate();
+      if (targetImg) targetImg.style.viewTransitionName = NAME;
+    });
+  } catch (e) {
+    if (sourceImg) sourceImg.style.viewTransitionName = "";
+    mutate();
+    return;
+  }
+
+  document.documentElement.classList.add("vt-running");
+  const cleanup = () => {
+    document.documentElement.classList.remove("vt-running");
+    if (sourceImg) sourceImg.style.viewTransitionName = "";
+    if (targetImg) targetImg.style.viewTransitionName = "";
+  };
+  transition.finished.then(cleanup, cleanup);
+}
+
+/** One-shot confirmation on the heart that was tapped. */
+function popFavorite(btn) {
+  if (!btn) return;
+  btn.classList.remove("is-pop");
+  void btn.offsetWidth;
+  btn.classList.add("is-pop");
+  window.setTimeout(() => btn.classList.remove("is-pop"), 480);
+}
+
+/** Haptic tick when favouriting — supported devices only, never under
+ *  prefers-reduced-motion. */
+function pulseFavorite() {
+  if (prefersReducedMotion()) return;
+  if (typeof navigator.vibrate === "function") {
+    try {
+      navigator.vibrate(8);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Rating bars fill once, the first time they scroll into view. Ratings inside
+ * a page that is still hidden simply wait for it.
+ */
+let ratingObserver = null;
+function armRatings(root) {
+  const scope = root || document;
+  const ratings = scope.querySelectorAll(".rating");
+  if (!ratings.length) return;
+
+  if (!("IntersectionObserver" in window)) {
+    ratings.forEach(r => r.classList.add("is-shown"));
+    return;
+  }
+
+  if (!ratingObserver) {
+    ratingObserver = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-shown");
+          ratingObserver.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.25 }
+    );
+  }
+
+  ratings.forEach(r => {
+    if (!r.classList.contains("is-shown")) ratingObserver.observe(r);
+  });
+}
+
+// ============================================================
+// LOAD ERRORS + RETRY (never a dead end)
+// ============================================================
+
+const LOAD_ERROR_COPY = {
+  categories: {
+    title: "تعذّر تحميل الأقسام",
+    text: "في مشكلة بالاتصال أو بخدمة البيانات. جرّب مرة تانية."
+  },
+  restaurants: {
+    title: "تعذّر تحميل المطاعم",
+    text: "في مشكلة بالاتصال أو بخدمة البيانات. جرّب مرة تانية."
+  }
+};
+
+function loadErrorHtml(kind) {
+  const copy = LOAD_ERROR_COPY[kind];
+  return emptyStateHtml(copy.title, copy.text, ["retry"]);
+}
+
+/* Both subscriptions report failures here instead of failing silently. */
+function handleSnapshotError(kind, error) {
+  if (error) console.error(kind + " onSnapshot:", error);
+
+  if (kind === "categories") {
+    categoriesLoaded = true;
+    categoriesLoadFailed = true;
+    filterCategories();
+  } else {
+    restaurantsLoaded = true;
+    restaurantsLoadFailed = true;
+    renderRestaurantsList("", false);
+  }
+
+  showToast("تعذّر تحميل البيانات. تحقّق من الاتصال وأعد المحاولة.", "error");
+}
+
+function retryLoad(kind) {
+  if (kind === "categories") {
+    if (typeof unsubscribeCategories === "function") {
+      try {
+        unsubscribeCategories();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    unsubscribeCategories = null;
+    categoriesLoadFailed = false;
+    categoriesLoaded = false;
+    renderCategorySkeleton();
+    listenToCategories();
+  } else {
+    if (typeof unsubscribeRestaurants === "function") {
+      try {
+        unsubscribeRestaurants();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    unsubscribeRestaurants = null;
+    restaurantsLoadFailed = false;
+    restaurantsLoaded = false;
+    renderRestaurantSkeleton();
+    listenToRestaurants();
+  }
+}
+
+/* One delegated listener serves every empty/error state's CTAs. */
+let emptyStateActionsWired = false;
+function wireEmptyStateActions() {
+  if (emptyStateActionsWired) return;
+  emptyStateActionsWired = true;
+  document.addEventListener("click", event => {
+    const target = event.target;
+    if (!target || !target.closest) return;
+    const btn = target.closest("[data-empty-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-empty-action");
+
+    if (action === "browse") {
+      showPage("pageCategories");
+      return;
+    }
+
+    if (action === "clear") {
+      const inCategories = !!btn.closest("#categoriesGridContainer");
+      const input = document.getElementById(
+        inCategories ? "categoriesSearchInput" : "restaurantsSearchInput"
+      );
+      if (!input) return;
+      const wrap = input.closest(".search-field");
+      const clearBtn = wrap && wrap.querySelector(".search-clear");
+      if (clearBtn) clearBtn.click();
+      else {
+        input.value = "";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      return;
+    }
+
+    if (action === "retry") {
+      retryLoad(btn.closest("#categoriesGridContainer") ? "categories" : "restaurants");
     }
   });
 }
@@ -316,6 +639,8 @@ function showPage(pageId, isBack = false) {
 
   const targetPage = document.getElementById(pageId);
   if (targetPage) {
+    // Direction of the entering transition: forward from below, back from above.
+    targetPage.classList.toggle("is-back", !!isBack);
     targetPage.classList.add("active");
     targetPage.style.display = "block";
   }
@@ -328,10 +653,17 @@ function showPage(pageId, isBack = false) {
   // Homepage-only atmosphere (blue gradient + centred app-bar brand line)
   document.body.classList.toggle("is-home", pageId === "pageHome");
 
-  // Dynamic app-bar title — presentation only
+  // Dynamic app-bar title — presentation only, with a short crossfade so the
+  // bar reads as part of the transition instead of a hard text swap.
   const titleEl = document.getElementById("headerTitleText");
   if (titleEl) {
-    titleEl.textContent = getPageTitle(pageId);
+    const nextPageTitle = getPageTitle(pageId);
+    if (titleEl.textContent !== nextPageTitle) {
+      titleEl.classList.remove("is-swap");
+      void titleEl.offsetWidth;
+      titleEl.classList.add("is-swap");
+    }
+    titleEl.textContent = nextPageTitle;
     titleEl.dir = "auto";
   }
 
@@ -349,12 +681,21 @@ function showPage(pageId, isBack = false) {
     localStorage.setItem("parentPage", "pageHome");
   }
 
-  // إذا تم فتح صفحة المطاعم، نخلط المطاعم عشوائياً
-  if (pageId === "pageRestaurants" && currentCategoryFilter) {
-    renderRestaurantsList("", true);
+  // فتح صفحة المطاعم: خلط القائمة، أو هيكل التحميل عند الدخول المباشر
+  if (pageId === "pageRestaurants") {
+    if (currentCategoryFilter) {
+      renderRestaurantsList("", true);
+    } else if (!restaurantsLoaded) {
+      renderRestaurantSkeleton();
+    } else {
+      renderRestaurantsList("", false);
+    }
   }
 
   window.scrollTo(0, 0);
+
+  // Section headings settle in behind the page transition.
+  revealActivePage(targetPage);
 }
 
 function goBack() {
@@ -1780,10 +2121,16 @@ function filterCategories() {
       return;
     }
 
+    if (categoriesLoadFailed) {
+      grid.innerHTML = loadErrorHtml("categories");
+      return;
+    }
+
     grid.innerHTML = queryStr
       ? emptyStateHtml(
           "لا توجد نتائج",
-          "ما لقينا قسم بهذا الاسم. جرّب كلمة تانية."
+          "ما لقينا قسم بهذا الاسم. جرّب كلمة تانية.",
+          ["clear"]
         )
       : emptyStateHtml(
           "لا توجد أقسام بعد",
@@ -1795,7 +2142,7 @@ function filterCategories() {
   }
 
 
-  filtered.forEach(data => {
+  filtered.forEach((data, index) => {
 
     const card =
       document.createElement("div");
@@ -1804,40 +2151,47 @@ function filterCategories() {
     card.className =
       "category-card";
 
+    if (!queryStr && index < 6) {
+      card.classList.add("stagger-in");
+      card.style.setProperty("--i", index);
+    }
 
-    card.onclick = () =>
+    const pair = pickArabicPair(data.nameAr, data.nameEn);
+
+    card.onclick = (event) =>
       openRestaurantsByCategory(
         data.id,
         data.nameAr ||
           data.nameEn,
-        data.imgUrl
+        data.imgUrl,
+        event
       );
 
     makeCardInteractive(card, card.onclick);
 
+    const catImg = data.imgUrl
+      ? `<img class="fade-img"
+          src="${escapeHtml(data.imgUrl)}"
+          alt="${escapeHtml(pair[0])}"
+          loading="lazy"
+          decoding="async"
+        >`
+      : "";
 
     card.innerHTML = `
 
       <div class="cat-media">
-        <img
-          src="${
-            data.imgUrl ||
-            "https://via.placeholder.com/400x300"
-          }"
-          alt="${data.nameAr || ""}"
-          loading="lazy"
-          decoding="async"
-        >
+        ${catImg}
       </div>
 
       <div class="cat-body">
-        <span class="cat-name">${data.nameAr || ""}</span>
+        <span class="cat-name">${escapeHtml(pair[0])}</span>
         <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </div>
 
       ${
-        data.nameEn
-          ? `<div class="cat-en">${data.nameEn}</div>`
+        pair[1]
+          ? `<div class="cat-en">${escapeHtml(pair[1])}</div>`
           : ""
       }
 
@@ -1847,6 +2201,11 @@ function filterCategories() {
     grid.appendChild(card);
 
   });
+
+  sweepImages(grid);
+
+  renderHomeCategories();
+  fixRegionImage();
 
 }
 
@@ -1874,51 +2233,869 @@ function filterRestaurants() {
 
 
 // ============================================================
+// MOTION: shared helpers + shell-ready gate
+// ============================================================
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const ARABIC_RE = /[\u0600-\u06FF]/;
+
+/** The two name fields arrive swapped in live data. Whichever one is Arabic
+ *  becomes the primary label, the other one sits underneath. */
+function pickArabicPair(a, b) {
+  const x = String(a || "").trim();
+  const y = String(b || "").trim();
+  if (!x && !y) return ["", ""];
+  if (!x) return [y, ""];
+  if (!y) return [x, ""];
+  return ARABIC_RE.test(x) ? [x, y] : [y, x];
+}
+
+function withAlpha(hex, alpha) {
+  let h = String(hex || "").replace("#", "").trim();
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(25,169,157,${alpha})`;
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+/** Callbacks that must not fire before the launch screen is gone. */
+let shellReadyFired = false;
+const shellReadyQueue = [];
+function whenShellReady(cb) {
+  if (typeof cb !== "function") return;
+  if (shellReadyFired) {
+    cb();
+    return;
+  }
+  shellReadyQueue.push(cb);
+}
+function fireShellReady() {
+  if (shellReadyFired) return;
+  shellReadyFired = true;
+  while (shellReadyQueue.length) {
+    try {
+      shellReadyQueue.shift()();
+    } catch (e) {
+      /* never let one callback block the rest */
+    }
+  }
+}
+
+// ============================================================
+// MOTION: launch splash — the mark assembles, one pass of light, hand-off
+// ============================================================
+
+const SPLASH_SEEN_KEY = "shu_badna_nekol_splash_seen";
+// The choreography below (mark 620ms, rim 780ms, light pass 900ms) has to be
+// able to finish before the screen leaves — 500ms was cutting the wordmark off
+// mid-fade and the tagline never appeared at all.
+const SPLASH_MIN_MS = 960;
+const SPLASH_MAX_MS = 1300;
+
+function initSplash() {
+  const splash = document.getElementById("splash");
+
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem(SPLASH_SEEN_KEY) === "1";
+  } catch (e) {
+    seen = false;
+  }
+
+  if (!splash || seen || prefersReducedMotion()) {
+    if (splash) splash.remove();
+    fireShellReady();
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(SPLASH_SEEN_KEY, "1");
+  } catch (e) {
+    /* private mode — worst case the screen shows again */
+  }
+
+  splash.hidden = false;
+
+  const startedAt = performance.now();
+  let dismissed = false;
+  const finish = () => {
+    if (dismissed) return;
+    dismissed = true;
+    dismissSplash(splash);
+  };
+
+  // Only the shell and the mark itself — never Firestore, never the full
+  // resource load, and always capped so it can never feel like a stall.
+  const shellReady =
+    document.readyState === "loading"
+      ? new Promise(resolve =>
+          document.addEventListener("DOMContentLoaded", resolve, { once: true })
+        )
+      : Promise.resolve();
+
+  Promise.race([
+    Promise.all([shellReady, decodeImage("iconnn.jpeg")]),
+    new Promise(resolve => setTimeout(resolve, SPLASH_MAX_MS))
+  ]).then(() => {
+    const elapsed = performance.now() - startedAt;
+    setTimeout(finish, Math.max(0, SPLASH_MIN_MS - elapsed));
+  });
+
+  setTimeout(finish, SPLASH_MAX_MS + 500);
+}
+
+function dismissSplash(splash) {
+  const mark = splash.querySelector(".splash-logo");
+  const target = document.querySelector(".masthead-logo");
+  const clearNames = () => {
+    if (mark) mark.style.viewTransitionName = "";
+    if (target) target.style.viewTransitionName = "";
+  };
+
+  let handedOff = false;
+  if (
+    typeof document.startViewTransition === "function" &&
+    !prefersReducedMotion() &&
+    target
+  ) {
+    try {
+      if (mark) mark.style.viewTransitionName = "brand-mark";
+      target.style.viewTransitionName = "brand-mark";
+      const transition = document.startViewTransition(() => splash.remove());
+      transition.finished.then(clearNames, clearNames);
+      handedOff = true;
+    } catch (e) {
+      clearNames();
+    }
+  }
+
+  if (!handedOff) {
+    splash.classList.add("is-leaving");
+    setTimeout(() => splash.remove(), 420);
+  }
+
+  // The homepage entrance choreography starts the moment the screen lifts.
+  fireShellReady();
+}
+
+// ============================================================
+// MOTION: category food moment — artwork, matching, scene controller
+// ============================================================
+
+const FOOD_HUE = {
+  pizza: "#e8613c",
+  burger: "#f0a13c",
+  snack: "#f0a13c",
+  shawarma: "#d98b3f",
+  sushi: "#4fc3b6",
+  chicken: "#f0b429",
+  pasta: "#f2c94c",
+  dessert: "#e97ba6",
+  coffee: "#c08a5e",
+  drinks: "#5ec8e5",
+  lebanese: "#e0553f",
+  seafood: "#4aa3d8",
+  bakery: "#e0a860",
+  breakfast: "#f5c451",
+  generic: null
+};
+
+const FOOD_ALIAS = { snack: "burger" };
+
+/** Editorial line drawings, 160×160, built from seven roles:
+ *  .o outline · .n neutral line · .of filled outline · .f/.f2/.d/.s washes ·
+ *  .w white · .sh contact shadow — plus motion roles .fa-step/.fa-slide/
+ *  .fa-pop/.fa-draw/.fa-shade/.fa-liquid/.fa-tilt/.fa-wedge. */
+const FOOD_ART = {
+  pizza: `
+    <ellipse class="sh" cx="80" cy="146" rx="48" ry="6"/>
+    <path class="of" d="M80 76 L99.2 23.4 A56 56 0 1 0 135.2 66.3 Z"/>
+    <path class="f2" d="M80 76 L95.4 33.7 A45 45 0 1 0 124.3 68.2 Z"/>
+    <circle class="s fa-pop" style="--si:0" cx="60" cy="54" r="6.5"/>
+    <circle class="s fa-pop" style="--si:1" cx="54" cy="96" r="6"/>
+    <circle class="s fa-pop" style="--si:1" cx="94" cy="104" r="6.5"/>
+    <circle class="s fa-pop" style="--si:2" cx="74" cy="120" r="5.5"/>
+    <circle class="s fa-pop" style="--si:2" cx="58" cy="76" r="5"/>
+    <g class="fa-wedge">
+      <path class="of" d="M80 76 L99.2 23.4 A56 56 0 0 1 135.2 66.3 Z"/>
+      <circle class="s" cx="106" cy="54" r="6"/>
+      <circle class="s" cx="113" cy="64" r="5"/>
+    </g>
+  `,
+
+  burger: `
+    <ellipse class="sh" cx="80" cy="142" rx="46" ry="6"/>
+    <g class="fa-step" style="--si:0">
+      <path class="of" d="M32 116 H128 a10 10 0 0 1 -10 14 H42 a10 10 0 0 1 -10 -14 Z"/>
+    </g>
+    <g class="fa-step" style="--si:1">
+      <rect class="d" x="34" y="96" width="92" height="20" rx="10"/>
+    </g>
+    <g class="fa-step" style="--si:2">
+      <path class="s" d="M34 86 h92 v10 H34 Z"/>
+      <path class="s" d="M50 96 l6 11 l6 -11 Z"/>
+      <path class="s" d="M98 96 l6 11 l6 -11 Z"/>
+    </g>
+    <g class="fa-step" style="--si:3">
+      <path class="s" d="M34 78 h92 v2 q-11 12 -23 0 q-11 12 -23 0 q-11 12 -23 0 q-11 12 -23 0 Z"/>
+      <path class="of" d="M34 78 A46 40 0 0 1 126 78 Z"/>
+      <ellipse class="w" cx="64" cy="60" rx="4.6" ry="3" transform="rotate(-18 64 60)"/>
+      <ellipse class="w" cx="86" cy="54" rx="4.6" ry="3"/>
+      <ellipse class="w" cx="106" cy="64" rx="4.6" ry="3" transform="rotate(20 106 64)"/>
+    </g>
+  `,
+
+  shawarma: `
+    <ellipse class="sh" cx="80" cy="142" rx="42" ry="6"/>
+    <g class="fa-tilt">
+      <path class="of" d="M46 34 Q80 22 114 34 L98 116 Q80 132 62 116 Z"/>
+      <path class="n fa-draw" pathLength="1" d="M52 58 Q80 68 108 58"/>
+      <path class="n fa-draw" pathLength="1" d="M56 82 Q80 92 104 82"/>
+      <path class="n fa-draw" pathLength="1" d="M61 104 Q80 114 99 104"/>
+      <path class="o fa-draw" pathLength="1" d="M80 30 V124"/>
+    </g>
+    <path class="n fa-draw" pathLength="1" d="M54 136 H106"/>
+  `,
+
+  sushi: `
+    <ellipse class="sh" cx="80" cy="132" rx="56" ry="7"/>
+    <path class="n fa-draw" pathLength="1" d="M20 116 H140"/>
+    <g class="fa-slide" style="--si:0">
+      <path class="w" d="M24 90 h44 v20 q0 8 -10 8 H34 q-10 0 -10 -8 Z"/>
+      <path class="s" d="M22 80 q0 -8 10 -8 h34 q10 0 10 8 v6 H22 Z"/>
+    </g>
+    <g class="fa-slide" style="--si:1">
+      <circle class="o" cx="82" cy="96" r="20"/>
+      <circle class="w" cx="82" cy="96" r="13"/>
+      <circle class="s" cx="82" cy="96" r="5"/>
+    </g>
+    <g class="fa-slide" style="--si:2">
+      <path class="w" d="M104 90 h30 q10 0 10 8 v12 q0 8 -10 8 h-30 q-10 0 -10 -8 V98 q0 -8 10 -8 Z"/>
+      <path class="s" d="M102 80 q0 -8 10 -8 h32 q10 0 10 8 v6 H102 Z"/>
+    </g>
+    <g class="fa-slide" style="--si:3">
+      <path class="n" d="M104 30 L138 70"/>
+      <path class="n" d="M118 26 L146 60"/>
+    </g>
+  `,
+
+  chicken: `
+    <ellipse class="sh" cx="80" cy="140" rx="46" ry="6"/>
+    <path class="f fa-shade" d="M44 80 C44 54 66 40 88 40 C112 40 126 58 126 80 C126 104 106 118 82 118 C58 118 44 104 44 80 Z"/>
+    <path class="o fa-draw" pathLength="1" d="M44 80 C44 54 66 40 88 40 C112 40 126 58 126 80 C126 104 106 118 82 118 C58 118 44 104 44 80 Z"/>
+    <path class="o fa-step" style="--si:0" d="M58 110 L46 126"/>
+    <circle class="o fa-step" style="--si:0" cx="43" cy="130" r="7"/>
+    <path class="o fa-step" style="--si:1" d="M110 110 L122 126"/>
+    <circle class="o fa-step" style="--si:1" cx="125" cy="130" r="7"/>
+    <path class="n fa-draw" pathLength="1" d="M74 62 Q94 58 110 72"/>
+    <path class="n fa-draw" pathLength="1" d="M62 86 Q82 98 106 92"/>
+  `,
+
+  pasta: `
+    <ellipse class="sh" cx="80" cy="148" rx="52" ry="7"/>
+    <path class="f fa-shade" d="M26 88 H134 A54 54 0 0 1 26 88 Z"/>
+    <path class="o fa-step" style="--si:0" d="M26 88 H134 A54 54 0 0 1 26 88 Z"/>
+    <path class="n fa-draw" pathLength="1" d="M44 76 q9 -14 18 0 t18 0 t18 0 t18 0"/>
+    <path class="n fa-draw" pathLength="1" d="M46 86 q9 -13 18 0 t18 0 t18 0"/>
+    <path class="n fa-draw" pathLength="1" d="M26 88 H134"/>
+    <g class="fa-step" style="--si:2">
+      <path class="o" d="M100 26 V56 M112 26 V62 M124 26 V56"/>
+      <path class="o" d="M100 56 q12 16 24 0"/>
+      <path class="o" d="M112 62 V126"/>
+    </g>
+  `,
+
+  dessert: `
+    <ellipse class="sh" cx="80" cy="142" rx="48" ry="6"/>
+    <path class="n fa-draw" pathLength="1" d="M32 136 H128"/>
+    <rect class="of fa-step" style="--si:0" x="42" y="106" width="76" height="28" rx="6"/>
+    <rect class="of fa-step" style="--si:1" x="50" y="80" width="60" height="26" rx="6"/>
+    <g class="fa-step" style="--si:2">
+      <rect class="of" x="58" y="56" width="44" height="24" rx="6"/>
+      <path class="s" d="M58 74 h44 v6 q-5.5 10 -11 0 q-5.5 10 -11 0 q-5.5 10 -11 0 q-5.5 10 -11 0 Z"/>
+    </g>
+    <g class="fa-pop" style="--si:3">
+      <circle class="s" cx="80" cy="44" r="9"/>
+      <path class="o" d="M80 35 q5 -9 15 -10"/>
+    </g>
+  `,
+
+  coffee: `
+    <ellipse class="sh" cx="76" cy="140" rx="46" ry="7"/>
+    <path class="n fa-draw" pathLength="1" d="M34 134 H118"/>
+    <path class="f fa-step" style="--si:0" d="M46 68 H108 L104 116 q-2 12 -14 12 H64 q-12 0 -14 -12 Z"/>
+    <path class="f2 fa-liquid" d="M51 78 H103 L100 114 q-2 10 -12 10 H66 q-10 0 -12 -10 Z"/>
+    <path class="o fa-step" style="--si:0" d="M46 68 H108 L104 116 q-2 12 -14 12 H64 q-12 0 -14 -12 Z"/>
+    <path class="o fa-step" style="--si:1" d="M108 78 a16 16 0 0 1 0 32"/>
+    <path class="n fa-draw" pathLength="1" d="M64 56 q7 -10 0 -20 q-7 -10 0 -18"/>
+    <path class="n fa-draw" pathLength="1" d="M88 52 q7 -10 0 -18 q-7 -9 0 -16"/>
+  `,
+
+  drinks: `
+    <ellipse class="sh" cx="80" cy="144" rx="36" ry="6"/>
+    <path class="f fa-step" style="--si:0" d="M54 44 H106 L99 126 q-1 10 -11 10 H72 q-10 0 -11 -10 Z"/>
+    <path class="f2 fa-liquid" d="M58 66 H102 L97 124 q-1 8 -10 8 H73 q-9 0 -10 -8 Z"/>
+    <path class="o fa-step" style="--si:0" d="M54 44 H106 L99 126 q-1 10 -11 10 H72 q-10 0 -11 -10 Z"/>
+    <path class="o fa-step" style="--si:1" d="M93 24 L79 92"/>
+    <path class="n fa-draw" pathLength="1" d="M64 58 L67 110"/>
+    <circle class="s fa-pop" style="--si:2" cx="70" cy="106" r="4"/>
+    <circle class="s fa-pop" style="--si:3" cx="87" cy="94" r="3.4"/>
+    <circle class="s fa-pop" style="--si:4" cx="76" cy="78" r="3"/>
+  `,
+
+  lebanese: `
+    <ellipse class="sh" cx="80" cy="146" rx="54" ry="6"/>
+    <path class="n fa-draw" pathLength="1" d="M24 108 H136"/>
+    <path class="n fa-draw" pathLength="1" d="M24 124 H136"/>
+    <path class="n fa-draw" pathLength="1" d="M24 140 H136"/>
+    <path class="o fa-draw" pathLength="1" d="M20 132 L140 44"/>
+    <g transform="rotate(-36 57 105)"><rect class="of fa-step" style="--si:0" x="44" y="92" width="26" height="26" rx="8"/></g>
+    <g transform="rotate(-36 81 87)"><rect class="of fa-step" style="--si:1" x="68" y="74" width="26" height="26" rx="8"/></g>
+    <g transform="rotate(-36 105 70)"><rect class="of fa-step" style="--si:2" x="92" y="57" width="26" height="26" rx="8"/></g>
+  `,
+
+  seafood: `
+    <ellipse class="sh" cx="78" cy="136" rx="54" ry="7"/>
+    <path class="f fa-shade" d="M110 76 C110 54 90 40 66 40 C42 40 24 56 24 76 C24 96 42 112 66 112 C90 112 110 98 110 76 Z"/>
+    <path class="o fa-draw" pathLength="1" d="M110 76 C110 54 90 40 66 40 C42 40 24 56 24 76 C24 96 42 112 66 112 C90 112 110 98 110 76 Z"/>
+    <path class="o fa-step" style="--si:0" d="M110 76 L140 52 L140 100 Z"/>
+    <path class="n fa-draw" pathLength="1" d="M54 48 q11 28 0 56"/>
+    <path class="n fa-draw" pathLength="1" d="M74 42 q13 18 0 34"/>
+    <circle class="s fa-pop" style="--si:1" cx="42" cy="66" r="5"/>
+    <g class="fa-pop" style="--si:2">
+      <circle class="f2" cx="124" cy="128" r="12"/>
+      <path class="n" d="M124 116 v24 M112 128 h24 M115.5 119.5 l17 17 M132.5 119.5 l-17 17"/>
+    </g>
+  `,
+
+  bakery: `
+    <ellipse class="sh" cx="80" cy="134" rx="52" ry="7"/>
+    <path class="f fa-shade" d="M30 104 Q30 66 80 66 Q130 66 130 104 Q130 120 116 120 H44 Q30 120 30 104 Z"/>
+    <path class="o fa-step" style="--si:0" d="M30 104 Q30 66 80 66 Q130 66 130 104 Q130 120 116 120 H44 Q30 120 30 104 Z"/>
+    <path class="o fa-draw" pathLength="1" d="M58 76 L46 98 M82 70 L70 94 M106 76 L94 98"/>
+    <path class="n fa-draw" pathLength="1" d="M64 54 q7 -9 0 -16 M88 50 q7 -9 0 -16"/>
+    <circle class="s fa-pop" style="--si:1" cx="46" cy="50" r="3"/>
+    <circle class="s fa-pop" style="--si:2" cx="118" cy="44" r="2.6"/>
+  `,
+
+  breakfast: `
+    <ellipse class="sh" cx="72" cy="134" rx="50" ry="7"/>
+    <path class="w fa-step" style="--si:0" d="M30 96 C22 76 40 60 58 64 C66 50 94 54 96 74 C116 78 116 106 96 110 C86 124 52 124 42 110 C32 108 30 102 30 96 Z"/>
+    <path class="o fa-step" style="--si:0" d="M30 96 C22 76 40 60 58 64 C66 50 94 54 96 74 C116 78 116 106 96 110 C86 124 52 124 42 110 C32 108 30 102 30 96 Z"/>
+    <circle class="s fa-pop" style="--si:1" cx="66" cy="88" r="15"/>
+    <g class="fa-step" style="--si:2">
+      <path class="of" d="M116 74 H146 L142 124 H120 Z"/>
+      <path class="f2" d="M119 92 H143 L140 120 H122 Z"/>
+    </g>
+    <path class="n fa-draw" pathLength="1" d="M126 64 q6 -8 0 -14"/>
+  `,
+
+  /* Generic: no artwork forced — an elegant plate that the photograph
+     develops into, sized to match the photo disc almost exactly. */
+  generic: `
+    <ellipse class="sh" cx="80" cy="150" rx="62" ry="6"/>
+    <circle class="f" cx="80" cy="76" r="71"/>
+    <circle class="o fa-draw" pathLength="1" cx="80" cy="76" r="71"/>
+    <circle class="n fa-draw" pathLength="1" cx="80" cy="76" r="61"/>
+    <path class="n fa-draw" pathLength="1" d="M80 14 A62 62 0 0 1 129 34"/>
+  `
+};
+
+const FOOD_MATCHERS = [
+  ["pizza", /pizza|pizz|بيتزا|بيتز/],
+  ["burger", /burger|برجر|برغر|همبر|ساندويش|سندويش/],
+  ["shawarma", /shawarma|shwarma|شاورما|شاوما|مناوي|شاو/],
+  ["sushi", /sushi|suchi|سوشي|سوشي/],
+  ["chicken", /chicken|farooj|فروج|فرخ|فرجان|ديك رومي|دجاج|شيش طاووق|طوق|طلوع/],
+  ["pasta", /pasta|noodle|معكرونة|مكرونة|باستا|سباغيتي|لازانيا|مقلوبة/],
+  ["dessert", /dessert|cake|sweet|حلويات|حلا|كيك|كيكة|آيس كريم|فطائر|كريب/],
+  ["coffee", /coffee|cafe|قهوة|قهه|كافيه|كافيه|لاتيه|اسبريسو|كابتشينو|قهوة/],
+  ["drinks", /drink|عصير|مشروب|مشروبات|شاي|ليموناضة|موهيتو|بيرة|آيس/],
+  ["seafood", /sea ?food|سمك|بحر|روبيان|محار|سلمون|تونة|كاليماري/],
+  ["bakery", /bakery|خبز|مناقيش|منقوشة|فطاير|زعتر|صمون|كعك|مرقوق/],
+  ["breakfast", /breakfast|terwee|فطور|ترويق|بيض|فول|لبنة|صحن/],
+  ["lebanese", /mashewe|مشاوي|مشويات|شواء|كباب|ليفتة|كسة|مندي|حمص|متبل|تبولة|فتوش|تبوله/],
+  ["snack", /snack|fast ?food|فاست فود|سناك|بطاطا|فرايز/]
+];
+
+function matchFoodKey(cat) {
+  if (!cat) return "generic";
+  const explicit = String(cat.motionKey || "").trim().toLowerCase();
+  if (explicit && FOOD_ART[explicit]) return explicit;
+
+  const hay = [cat.nameAr, cat.nameEn, cat.id]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/\u0640/g, "");
+
+  for (let i = 0; i < FOOD_MATCHERS.length; i++) {
+    if (FOOD_MATCHERS[i][1].test(hay)) return FOOD_MATCHERS[i][0];
+  }
+  return "generic";
+}
+
+const MOMENT_SEEN_KEY = "shu_badna_nekol_moments_seen";
+let momentActive = false;
+let momentTimers = [];
+let homeRailSignature = "";
+
+function readSeenMoments() {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(MOMENT_SEEN_KEY) || "[]");
+    return new Set(Array.isArray(list) ? list : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function rememberMoment(id) {
+  try {
+    const set = readSeenMoments();
+    set.add(id);
+    sessionStorage.setItem(MOMENT_SEEN_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {
+    /* private mode — the full scene simply plays every time */
+  }
+}
+
+function clearMomentTimers() {
+  momentTimers.forEach(id => clearTimeout(id));
+  momentTimers = [];
+}
+
+/**
+ * Mounts the signature scene. Returns the scene descriptor, or null when it
+ * should not play (reduced motion, another scene running, no markup).
+ * Navigation is deliberately NOT done here — it happens on the same frame,
+ * underneath the overlay, so nothing ever waits on this.
+ */
+function startCategoryMoment(cat, title, photo, sourceEl) {
+  const layer = document.getElementById("momentLayer");
+  if (!layer || momentActive || prefersReducedMotion()) return null;
+
+  const key = matchFoodKey(cat);
+  const artKey = FOOD_ALIAS[key] || key;
+  const hue = FOOD_HUE[key] || FOOD_HUE.generic;
+
+  const id =
+    (cat && (cat.id || cat.nameAr || cat.nameEn)) || title || photo || "moment";
+  const full = !readSeenMoments().has(id);
+  rememberMoment(id);
+
+  const art = document.getElementById("momentArt");
+  const img = document.getElementById("momentImg");
+  const titleAr = document.getElementById("momentTitleAr");
+  const titleEn = document.getElementById("momentTitleEn");
+
+  let primary = "";
+  let secondary = "";
+  if (cat && (cat.nameAr || cat.nameEn)) {
+    const pair = pickArabicPair(cat.nameAr, cat.nameEn);
+    primary = pair[0];
+    secondary = pair[1];
+  }
+  if (!primary && !secondary) primary = title || "";
+
+  const disc = layer.querySelector(".moment-disc");
+
+  layer.hidden = false;
+  layer.classList.toggle("is-short", !full);
+  layer.style.setProperty("--food", hue || "var(--accent)");
+  layer.style.setProperty("--food-soft", withAlpha(hue || "#19a99d", 0.34));
+
+  if (art) {
+    art.innerHTML = full
+      ? `<svg class="fa" viewBox="0 0 160 160" aria-hidden="true">${
+          FOOD_ART[artKey] || FOOD_ART.generic
+        }</svg>`
+      : "";
+  }
+  if (titleAr) {
+    titleAr.textContent = primary;
+    titleAr.hidden = !primary;
+  }
+  if (titleEn) {
+    titleEn.textContent = secondary;
+    titleEn.hidden = !secondary;
+  }
+  if (img) {
+    if (photo) img.setAttribute("src", photo);
+    else img.removeAttribute("src");
+  }
+
+  // --- FLIP: start the photo exactly where the tapped card showed it -------
+  let rect = null;
+  if (photo && sourceEl && typeof sourceEl.querySelector === "function") {
+    const media = sourceEl.querySelector(".cat-media, .homecat-media") || sourceEl;
+    rect = media.getBoundingClientRect();
+  }
+
+  if (disc) {
+    disc.style.transition = "none";
+    disc.style.borderRadius = "50%";
+    disc.style.transform = "";
+
+    if (photo && rect && rect.width > 4) {
+      const last = disc.getBoundingClientRect();
+      if (last.width > 4) {
+        const dx = rect.left + rect.width / 2 - (last.left + last.width / 2);
+        const dy = rect.top + rect.height / 2 - (last.top + last.height / 2);
+        const scale = Math.max(0.1, Math.min(4, rect.width / last.width));
+        disc.style.borderRadius = "14px";
+        disc.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+      } else {
+        disc.style.transform = "scale(0.72)";
+      }
+    } else if (photo) {
+      disc.style.transform = "scale(0.72)";
+    } else {
+      disc.style.display = "none";
+    }
+  }
+
+  const dur = readMomentDuration(layer, full);
+  momentActive = true;
+  clearMomentTimers();
+
+  // Everything downstream is a fraction of the scene duration, so CSS is the
+  // single source of truth for how long the whole thing takes.
+  return {
+    full,
+    dur,
+    morph: dur * (full ? 0.51 : 0.654),
+    dockAt: dur * 0.8,
+    dockDur: dur * 0.18,
+    endAt: dur * 1.1
+  };
+}
+
+/** CSS owns the length of the scene (`.moment { --moment-dur }`). Reading it
+ *  back keeps JS and keyframes from ever drifting apart. */
+function readMomentDuration(layer, full) {
+  const fallback = full ? 900 : 520;
+  if (!layer) return fallback;
+  const raw = parseFloat(
+    getComputedStyle(layer).getPropertyValue("--moment-dur")
+  );
+  return isFinite(raw) && raw >= 240 ? raw : fallback;
+}
+
+/** Kicks the flight + schedules the dock and the teardown. */
+function runCategoryMoment(scene) {
+  const layer = document.getElementById("momentLayer");
+  const disc = layer && layer.querySelector(".moment-disc");
+  if (!layer || !disc) return;
+
+  if (disc.style.transform) {
+    // Commit the starting box first, otherwise the browser never sees a
+    // "before" value and the transition simply does not run.
+    void disc.offsetWidth;
+    disc.style.transition = `transform ${scene.morph}ms var(--e-out), ` +
+      `border-radius ${scene.morph}ms var(--e-out)`;
+    disc.style.transform = "none";
+    disc.style.borderRadius = "50%";
+  }
+
+  // The category header settles in as the scrim dissolves, so the reveal is
+  // not a static list appearing out of nowhere.
+  const strip = document.querySelector("#pageRestaurants .cat-strip");
+  if (strip && scene.full) {
+    const delay = Math.round(scene.dur * 0.62);
+    strip.style.animation = "none";
+    void strip.offsetWidth;
+    strip.style.animation = `reveal-in 420ms var(--e-out) ${delay}ms both`;
+    momentTimers.push(
+      setTimeout(() => {
+        strip.style.animation = "";
+      }, delay + 460)
+    );
+  }
+
+  momentTimers.push(setTimeout(() => dockCategoryMoment(scene), scene.dockAt));
+  momentTimers.push(setTimeout(endCategoryMoment, scene.endAt));
+}
+
+/** Photograph flies into the hero strip — then the layer is dropped with it
+ *  sitting exactly on top of an identical photo, so nothing blinks. */
+function dockCategoryMoment(scene) {
+  const layer = document.getElementById("momentLayer");
+  const disc = layer && layer.querySelector(".moment-disc");
+  const hero = document.getElementById("categoryHeroImg");
+  if (!disc || !hero || disc.style.display === "none") return;
+
+  const to = hero.getBoundingClientRect();
+  const from = disc.getBoundingClientRect();
+  if (!to.width || !from.width || !isFinite(to.width)) return;
+
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  const scale = to.width / from.width;
+  if (!isFinite(dx) || !isFinite(dy) || !isFinite(scale)) return;
+
+  // Match the thumbnail's own corner radius exactly, and stand the
+  // presentation down so the landing is invisible.
+  const heroRadius = getComputedStyle(hero).borderRadius;
+  layer.classList.add("is-docking");
+
+  disc.style.transition =
+    `transform ${scene.dockDur}ms var(--e-inout), ` +
+    `border-radius ${scene.dockDur}ms var(--e-inout), ` +
+    `box-shadow ${scene.dockDur}ms linear`;
+  disc.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+  disc.style.borderRadius = heroRadius || "26%";
+  disc.style.boxShadow = "none";
+}
+
+function endCategoryMoment() {
+  const layer = document.getElementById("momentLayer");
+  clearMomentTimers();
+  momentActive = false;
+  if (!layer || layer.hidden) return;
+
+  layer.hidden = true;
+  layer.classList.remove("is-skip", "is-short", "is-docking");
+
+  const art = document.getElementById("momentArt");
+  if (art) art.innerHTML = "";
+  const img = document.getElementById("momentImg");
+  if (img) img.removeAttribute("src");
+
+  const disc = layer.querySelector(".moment-disc");
+  if (disc) {
+    disc.style.transition = "none";
+    disc.style.transform = "";
+    disc.style.borderRadius = "";
+    disc.style.boxShadow = "";
+    disc.style.display = "";
+  }
+
+  layer.style.removeProperty("--food");
+  layer.style.removeProperty("--food-soft");
+}
+
+function skipCategoryMoment() {
+  const layer = document.getElementById("momentLayer");
+  if (!layer || layer.hidden || layer.classList.contains("is-skip")) return;
+  clearMomentTimers();
+  layer.classList.add("is-skip");
+  momentTimers.push(setTimeout(endCategoryMoment, 200));
+}
+
+// ============================================================
+// MOTION: scroll / section reveals + broken hero photo fallback
+// ============================================================
+
+function revealActivePage(pageEl) {
+  if (!pageEl) return;
+  const items = pageEl.querySelectorAll(".section-head, .profile-cta");
+  items.forEach((el, index) => {
+    if (el.classList.contains("reveal")) el.classList.remove("is-in");
+    el.classList.add("reveal");
+    el.style.setProperty("--ri", index);
+  });
+  void pageEl.offsetWidth;
+  items.forEach(el => el.classList.add("is-in"));
+}
+
+/** The configured hero photo 404s. Falls back to real category photography
+ *  before giving up on the block entirely. */
+function fixRegionImage() {
+  const img = document.querySelector(".region-img");
+  if (!img) return;
+  const failed = img.complete && img.naturalWidth === 0;
+  if (!img.classList.contains("is-broken") && !failed) return;
+  if (img.dataset.fallbackTried === "1") return;
+
+  const withPhoto = allCategories.find(c => c.imgUrl);
+  if (!withPhoto) return;
+
+  img.dataset.fallbackTried = "1";
+  img.classList.remove("is-broken");
+  setImgSrc(img, withPhoto.imgUrl);
+}
+
+// ============================================================
+// MOTION: home category rail — food discovery above the fold
+// ============================================================
+
+function renderHomeCategories() {
+  const section = document.getElementById("homeCats");
+  const rail = document.getElementById("homeCatsRail");
+  if (!section || !rail) return;
+
+  const items = allCategories.filter(c => c.nameAr || c.nameEn);
+  if (!items.length) {
+    section.hidden = true;
+    homeRailSignature = "";
+    return;
+  }
+
+  // The rail is fed the full category list, so a search keystroke that
+  // re-runs the grid render must not rebuild (and re-animate) it.
+  const signature = items
+    .map(c => c.id + "|" + (c.imgUrl || ""))
+    .join("~");
+  if (rail.children.length && signature === homeRailSignature) return;
+  homeRailSignature = signature;
+
+  section.hidden = false;
+  rail.innerHTML = items
+    .map((data, index) => {
+      const pair = pickArabicPair(data.nameAr, data.nameEn);
+      const photo = data.imgUrl
+        ? `<img class="fade-img" src="${escapeHtml(
+            data.imgUrl
+          )}" alt="${escapeHtml(pair[0])}" loading="lazy" decoding="async">`
+        : "";
+
+      return (
+        `<button class="homecat${index < 6 ? " stagger-in" : ""}" type="button" ` +
+        `data-cat="${escapeHtml(data.id)}" style="--i:${index}">` +
+        `<span class="homecat-media">${photo}</span>` +
+        `<span class="homecat-copy">` +
+        `<span class="homecat-name">${escapeHtml(pair[0])}</span>` +
+        (pair[1]
+          ? `<span class="homecat-en">${escapeHtml(pair[1])}</span>`
+          : "") +
+        `</span></button>`
+      );
+    })
+    .join("");
+
+  rail.querySelectorAll(".homecat").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const data = allCategories.find(c => c.id === btn.dataset.cat);
+      if (!data) return;
+      openRestaurantsByCategory(
+        data.id,
+        data.nameAr || data.nameEn,
+        data.imgUrl,
+        btn
+      );
+    });
+  });
+
+  sweepImages(rail);
+}
+
+/* Home shows what the user actually saved. Called whenever the restaurant
+   data lands and whenever a heart is toggled, so the rail never lies. */
+function renderHomeSaved() {
+  const section = document.getElementById("homeCats");
+  const rail = document.getElementById("homeSavedRail");
+  const empty = document.getElementById("homeSavedEmpty");
+  if (!section || !rail) return;
+
+  const ids = readFavorites();
+  const items = ids
+    .map(id => allRestaurants.find(r => r && r.id === id))
+    .filter(Boolean);
+
+  section.hidden = false;
+
+  if (empty) empty.hidden = items.length > 0;
+
+  if (!items.length) {
+    rail.innerHTML = "";
+    rail.dataset.sig = "";
+    return;
+  }
+
+  const signature = items
+    .map(r => r.id + "|" + (r.cover || r.logo || ""))
+    .join("~");
+  if (rail.children.length && rail.dataset.sig === signature) return;
+  rail.dataset.sig = signature;
+
+  rail.innerHTML = items
+    .map((r, index) => {
+      const photo = r.cover || r.logo
+        ? `<img class="fade-img" src="${escapeHtml(
+            r.cover || r.logo
+          )}" alt="${escapeHtml(r.name || "")}" loading="lazy" decoding="async">`
+        : "";
+
+      return (
+        `<button class="homecat" type="button" ` +
+        `data-rest="${escapeHtml(r.id)}" style="--i:${index}">` +
+        `<span class="homecat-media">${photo}</span>` +
+        `<span class="homecat-copy">` +
+        `<span class="homecat-name">${escapeHtml(r.name || "")}</span>` +
+        `</span></button>`
+      );
+    })
+    .join("");
+
+  rail.querySelectorAll(".homecat").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const data = allRestaurants.find(r => r && r.id === btn.dataset.rest);
+      if (data) openRestaurantProfile(data, btn);
+    });
+  });
+
+  sweepImages(rail);
+}
+
+// ============================================================
 // OPEN RESTAURANTS BY CATEGORY (WITH SAVED FILTER STATE)
 // ============================================================
 
-function openRestaurantsByCategory(
-  catId,
-  catName,
-  catImg
-) {
+function openRestaurantsByCategory(catId, catName, catImg, event) {
+  const cat = allCategories.find(c => c.id === catId) || null;
 
   currentCategoryFilter = catId;
-  
+
   // حفظ القسم المحدد في الـ localStorage لكي لا يضيع عند إعادة التحميل
+  const pair = cat ? pickArabicPair(cat.nameAr, cat.nameEn) : ["", ""];
+  const display = (pair[0] || pair[1] || catName || "").trim() || "المطاعم";
   localStorage.setItem("currentCategoryFilter", catId);
-  if (catName) localStorage.setItem("currentCategoryName", catName);
+  localStorage.setItem("currentCategoryName", display);
   if (catImg) localStorage.setItem("currentCategoryImg", catImg);
 
-  const heroTitle =
-    document.getElementById(
-      "categoryHeroTitle"
-    );
+  // An Event (card click) or a plain element (home rail button).
+  const sourceEl = event && (event.currentTarget || event);
 
+  const applyHeader = () => {
+    const heroTitle = document.getElementById("categoryHeroTitle");
+    if (heroTitle) heroTitle.innerText = display;
+    const heroImg = document.getElementById("categoryHeroImg");
+    if (heroImg) setImgSrc(heroImg, catImg || "");
+    renderRestaurantsList("", true);
+    showPage("pageRestaurants");
+  };
 
-  const heroImg =
-    document.getElementById(
-      "categoryHeroImg"
-    );
+  const scene = startCategoryMoment(cat, display, catImg, sourceEl);
 
+  if (scene) {
+    // The overlay is already painted at full opacity, so the swap underneath
+    // is invisible and navigation happens on this very frame.
+    applyHeader();
+    runCategoryMoment(scene);
+    return;
+  }
 
-  if (heroTitle)
-    heroTitle.innerText = catName || "المطاعم";
+  const sourceImg =
+    sourceEl && typeof sourceEl.querySelector === "function"
+      ? sourceEl.querySelector(".cat-media img, .homecat-media img")
+      : null;
+  const heroImg = document.getElementById("categoryHeroImg");
 
-
-  if (heroImg)
-    heroImg.src =
-      catImg ||
-      "https://via.placeholder.com/400x150";
-
-
-  renderRestaurantsList("", true);
-
-
-  showPage(
-    "pageRestaurants"
+  // Without a moment (reduced motion / no artwork) the photo morph simply
+  // travels from card to hero, or the CSS crossfade takes over.
+  runViewTransition(
+    catImg && sourceImg ? sourceImg : null,
+    catImg && sourceImg ? heroImg : null,
+    catImg,
+    applyHeader
   );
-
 }
 
 
@@ -1949,10 +3126,12 @@ function format12HourTime(timeStr) {
   if (!timeStr) return "";
   const [hourStr, minStr] = timeStr.split(':');
   let hour = parseInt(hourStr, 10);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
+  if (!isFinite(hour)) return "";
+  const meridiem = hour >= 12 ? "م" : "ص"; // PM / AM, in Arabic
   hour = hour % 12;
   hour = hour ? hour : 12;
-  return `${hour}:${minStr} ${ampm}`;
+  const minutes = String(minStr || "00").slice(0, 2).padStart(2, "0");
+  return `${hour}:${minutes} ${meridiem}`;
 }
 
 
@@ -1999,6 +3178,7 @@ function toggleFavorite(id) {
   }
 
   syncFavoriteUI(id);
+  renderHomeSaved();
   return nowFavorite;
 }
 
@@ -2031,6 +3211,15 @@ function favoriteButtonHtml(id) {
     </button>`;
 }
 
+/* Toggles, then gives feedback on the exact heart that was pressed: a pop, a
+   ring, and a light haptic when something was actually added. */
+function toggleFavoriteFeedback(btn, getId) {
+  const nowFavorite = toggleFavorite(getId());
+  popFavorite(btn);
+  if (nowFavorite) pulseFavorite();
+  return nowFavorite;
+}
+
 /* A heart sits inside a clickable card, so it must swallow the card's
    navigation — on pointer, on keyboard, and on bubbled key events. */
 function wireFavoriteButton(btn, getId) {
@@ -2039,14 +3228,14 @@ function wireFavoriteButton(btn, getId) {
   btn.addEventListener("click", event => {
     event.preventDefault();
     event.stopPropagation();
-    toggleFavorite(getId());
+    toggleFavoriteFeedback(btn, getId);
   });
 
   btn.addEventListener("keydown", event => {
     if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
       event.preventDefault();
       event.stopPropagation();
-      toggleFavorite(getId());
+      toggleFavoriteFeedback(btn, getId);
     }
   });
 
@@ -2079,15 +3268,12 @@ function ratingHtml(value, extraClass = "") {
   const n = normalizeRating(value);
   if (n === null) return ""; // no rating configured → show nothing
 
-  const percent = (n / 5) * 100;
   const label = ratingText(n);
 
+  /* Compact single-star form: ★4.5 — one mark, one number, no star row. */
   return `
     <span class="rating ${extraClass}" role="img" aria-label="التقييم ${label} من 5">
-      <span class="rating-stars" aria-hidden="true">
-        <span class="rating-stars-track">★★★★★</span>
-        <span class="rating-stars-fill" style="width:${percent}%">★★★★★</span>
-      </span>
+      <span class="rating-star" aria-hidden="true">★</span>
       <span class="rating-value">${label}</span>
     </span>`;
 }
@@ -2215,14 +3401,30 @@ function renderRestaurantsList(
       return;
     }
 
+    if (restaurantsLoadFailed) {
+      container.innerHTML = loadErrorHtml("restaurants");
+      return;
+    }
+
+    if (!currentCategoryFilter) {
+      container.innerHTML = emptyStateHtml(
+        "اختر قسم أولاً",
+        "افتح أي قسم من الأقسام وبتظهرلك مطاعمه هون.",
+        ["browse"]
+      );
+      return;
+    }
+
     container.innerHTML = searchQuery
       ? emptyStateHtml(
           "لا توجد نتائج",
-          "ما لقينا مطعم بهالاسم داخل هالقسم. جرّب اسم تاني."
+          "ما لقينا مطعم بهالاسم داخل هالقسم. جرّب اسم تاني.",
+          ["clear"]
         )
       : emptyStateHtml(
           "ما في مطاعم هون لحدّا",
-          "جرّب قسم تاني أو تصفّح الأقسام الرئيسية."
+          "جرّب قسم تاني أو تصفّح الأقسام الرئيسية.",
+          ["browse"]
         );
 
     return;
@@ -2241,8 +3443,11 @@ function renderRestaurantsList(
 
   const finalOrderedList = [...openRestaurants, ...closedRestaurants];
 
+  // Entrance runs only on list entry — never while the user is typing.
+  const animateEntrance = shouldShuffle && !searchQuery;
 
-  finalOrderedList.forEach(r => {
+
+  finalOrderedList.forEach((r, index) => {
 
     const card =
       document.createElement("div");
@@ -2253,31 +3458,41 @@ function renderRestaurantsList(
     card.className =
       `restaurant-card ${closed ? 'is-closed' : 'is-open'}`;
 
+    if (animateEntrance && index < 6) {
+      card.classList.add("stagger-in");
+      card.style.setProperty("--i", index);
+    }
 
-    card.onclick = () =>
-      openRestaurantProfile(r);
+
+    card.onclick = (event) =>
+      openRestaurantProfile(r, event);
 
     makeCardInteractive(card, card.onclick);
 
     const formattedOpenTime = format12HourTime(r.openTime || "11:00");
     const formattedCloseTime = format12HourTime(r.closeTime || "");
 
-    const logoUrl = r.logo || "https://via.placeholder.com/200";
     const hasCover = !!(r.cover && String(r.cover).trim());
+    const logoHtml = r.logo
+      ? `<img class="rc-logo fade-img" src="${r.logo}" alt="" loading="lazy" decoding="async">`
+      : "";
+    const brandHtml = r.logo
+      ? `<img class="rc-brand fade-img" src="${r.logo}" alt="" loading="lazy" decoding="async">`
+      : "";
 
     const mediaHtml = hasCover
       ? `
         <div class="rc-media">
-          <img class="rc-cover" src="${r.cover}" alt="" loading="lazy" decoding="async">
+          <img class="rc-cover fade-img" src="${r.cover}" alt="" loading="lazy" decoding="async">
           <div class="rc-badge">
-            <img class="rc-logo" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+            ${logoHtml}
             <span class="rc-name">${r.name || ""}</span>
           </div>
         </div>`
       : `
         <div class="rc-media is-brand">
           <div class="rc-badge">
-            <img class="rc-brand" src="${logoUrl}" alt="" loading="lazy" decoding="async">
+            ${brandHtml}
             <span class="rc-name">${r.name || ""}</span>
           </div>
         </div>`;
@@ -2320,6 +3535,8 @@ function renderRestaurantsList(
 
   });
 
+  armRatings(container);
+  sweepImages(container);
 }
 
 
@@ -2336,22 +3553,23 @@ function fillRestaurantProfileDOM(r) {
   const contactBtn = document.getElementById("profileContactBtn");
   const locationBtn = document.getElementById("profileLocationBtn");
 
-  /* --- Cover banner (new presentation element) --- */
+  /* --- Cover banner (identity sits on top of it) --- */
   const coverWrap = document.getElementById("profileCover");
   const coverImg = document.getElementById("profileCoverImg");
   if (coverWrap && coverImg) {
     if (r.cover) {
-      coverImg.src = r.cover;
+      setImgSrc(coverImg, r.cover);
       coverImg.alt = (r.name || "") + " — صورة الغلاف";
-      coverWrap.hidden = false;
+      coverWrap.classList.remove("is-empty");
     } else {
-      coverImg.removeAttribute("src");
-      coverWrap.hidden = true;
+      /* No cover photo: the panel stays so the logo + name keep their place,
+         it just drops back to the flat surface. */
+      setImgSrc(coverImg, "");
+      coverWrap.classList.add("is-empty");
     }
   }
 
-  if (profileLogo)
-    profileLogo.src = r.logo || "https://via.placeholder.com/200";
+  if (profileLogo) setImgSrc(profileLogo, r.logo || "");
 
   if (profileName)
     profileName.innerText = r.name || "";
@@ -2387,13 +3605,14 @@ function fillRestaurantProfileDOM(r) {
     const ratingMarkup = ratingHtml(r.rating);
     ratingEl.innerHTML = ratingMarkup || "";
     ratingEl.hidden = !ratingMarkup;
+    armRatings(ratingEl);
   }
 
   /* --- Favorite toggle (localStorage) --- */
   const favBtn = document.getElementById("profileFavBtn");
   if (favBtn) {
     favBtn.dataset.favId = r.id || "";
-    favBtn.onclick = () => toggleFavorite(r.id);
+    favBtn.onclick = () => toggleFavoriteFeedback(favBtn, () => r.id);
     syncFavoriteUI(r.id);
   }
 
@@ -2474,13 +3693,22 @@ function sendSecureOrderWhatsApp() {
   showToast("ما في رقم واتساب مسجل لهذا المطعم.", "error");
 }
 
-function openRestaurantProfile(r) {
+function openRestaurantProfile(r, event) {
   // حفظ بيانات المطعم الحالي في الـ localStorage لتفادي فقدانها عند عمل Refresh
   localStorage.setItem("currentRestaurantProfile", JSON.stringify(r));
 
-  fillRestaurantProfileDOM(r);
+  const sourceImg =
+    event && event.currentTarget
+      ? event.currentTarget.querySelector(".rc-cover")
+      : null;
+  const coverImg = document.getElementById("profileCoverImg");
+  const hasCover = !!(r.cover && String(r.cover).trim());
+  const targetImg = hasCover ? coverImg : null;
 
-  showPage("pageRestProfile");
+  runViewTransition(sourceImg, targetImg, r.cover, () => {
+    fillRestaurantProfileDOM(r);
+    showPage("pageRestProfile");
+  });
 }
 
 
@@ -2501,9 +3729,14 @@ function listenToCategories() {
       );
 
 
-    onSnapshot(
+    unsubscribeCategories = onSnapshot(
       q,
       snapshot => {
+        // A cold offline cache reports "0 documents" before the server has
+        // ever answered. Treating that as authoritative would tell the user
+        // this app has no categories instead of that the connection is down —
+        // hold the skeletons and let the 9s watchdog show the real error.
+        if (snapshot.empty && snapshot.metadata.fromCache) return;
 
         allCategories =
           [];
@@ -2559,6 +3792,7 @@ function listenToCategories() {
         });
 
         categoriesLoaded = true;
+        categoriesLoadFailed = false;
 
         allCategories.forEach(data => {
           const id = data.id;
@@ -2647,13 +3881,13 @@ function listenToCategories() {
 
         filterCategories();
 
-      }
+      },
+      error => handleSnapshotError("categories", error)
     );
-
 
   } catch (e) {
 
-    console.error(e);
+    handleSnapshotError("categories", e);
 
   }
 
@@ -2681,9 +3915,11 @@ function listenToRestaurants() {
       );
 
 
-    onSnapshot(
+    unsubscribeRestaurants = onSnapshot(
       q,
       snapshot => {
+        // same as categories: an empty cache snapshot is not an answer
+        if (snapshot.empty && snapshot.metadata.fromCache) return;
 
         allRestaurants =
           [];
@@ -2813,6 +4049,7 @@ function listenToRestaurants() {
         );
 
         restaurantsLoaded = true;
+        restaurantsLoadFailed = false;
 
         if (adminRestContainer && adminRestContainer.children.length === 0) {
           adminRestContainer.innerHTML =
@@ -2825,18 +4062,32 @@ function listenToRestaurants() {
           const heroTitle = document.getElementById("categoryHeroTitle");
           const heroImg = document.getElementById("categoryHeroImg");
           if (heroTitle) heroTitle.innerText = localStorage.getItem("currentCategoryName") || "المطاعم";
-          if (heroImg) heroImg.src = localStorage.getItem("currentCategoryImg") || "https://via.placeholder.com/400x150";
+          setImgSrc(heroImg, localStorage.getItem("currentCategoryImg") || "");
 
-          renderRestaurantsList("", true);
+          const restaurantsPage = document.getElementById("pageRestaurants");
+          const pageActive = !!(restaurantsPage && restaurantsPage.classList.contains("active"));
+          const listContainer = document.getElementById("restaurantsListContainer");
+          const waiting = !!(listContainer && listContainer.querySelector(".skel-card, .empty"));
+
+          // Re-render on entry or while still waiting — but never wipe a search
+          // the user is typing into, and never reshuffle under a rendered list.
+          if (pageActive || waiting) {
+            const searchInput = document.getElementById("restaurantsSearchInput");
+            const activeQuery = ((searchInput && searchInput.value) || "").trim().toLowerCase();
+            renderRestaurantsList(activeQuery, !activeQuery);
+          }
         }
 
-      }
+        renderHomeSaved();
+
+      },
+      error => handleSnapshotError("restaurants", error)
     );
 
 
   } catch (e) {
 
-    console.error(e);
+    handleSnapshotError("restaurants", e);
 
   }
 
@@ -3649,27 +4900,52 @@ function initDesignSystem() {
     }
   });
 
+  /* --- One delegated listener serves every empty/error state CTA --- */
+  wireEmptyStateActions();
+
+  /* --- The category moment is skippable: any tap while it plays --- */
+  const momentLayer = document.getElementById("momentLayer");
+  if (momentLayer) momentLayer.addEventListener("pointerdown", skipCategoryMoment);
+
+  /* --- The broken hero photo retries against real category photography --- */
+  const regionImg = document.querySelector(".region-img");
+  if (regionImg && !regionImg.dataset.wired) {
+    regionImg.dataset.wired = "1";
+    regionImg.addEventListener("error", fixRegionImage);
+  }
+
+  /* --- Launch screen: the first open of this session only --- */
+  initSplash();
+
+  /* --- Homepage entrance waits for the screen to lift, never for data --- */
+  whenShellReady(() => {
+    if (document.body.classList.contains("is-home")) {
+      document.body.classList.add("is-entering");
+      setTimeout(() => document.body.classList.remove("is-entering"), 1500);
+    }
+    revealActivePage(document.querySelector(".view-page.active"));
+  });
+
+  /* --- Images already in cache finish their develop instantly --- */
+  sweepImages(document);
+
   /* --- Loading skeletons until the first Firestore snapshot --- */
   if (!categoriesLoaded) renderCategorySkeleton();
-  if (!restaurantsLoaded && currentCategoryFilter) renderRestaurantSkeleton();
+  if (!restaurantsLoaded) renderRestaurantSkeleton();
 
   /* --- If Firestore never answers (offline), swap skeletons for a real
          error state instead of an endless shimmer --- */
   setTimeout(function () {
     const grid = document.getElementById("categoriesGridContainer");
     if (!categoriesLoaded && grid && !grid.querySelector(".category-card")) {
-      grid.innerHTML = emptyStateHtml(
-        "تعذّر تحميل الأقسام",
-        "تحقّق من اتصالك بالإنترنت ثم أعد تحميل الصفحة."
-      );
+      grid.innerHTML = loadErrorHtml("categories");
+      wireEmptyStateActions();
     }
 
     const list = document.getElementById("restaurantsListContainer");
     if (!restaurantsLoaded && list && !list.querySelector(".restaurant-card")) {
-      list.innerHTML = emptyStateHtml(
-        "تعذّر تحميل المطاعم",
-        "تحقّق من اتصالك بالإنترنت ثم أعد تحميل الصفحة."
-      );
+      list.innerHTML = loadErrorHtml("restaurants");
+      wireEmptyStateActions();
     }
   }, 9000);
 }

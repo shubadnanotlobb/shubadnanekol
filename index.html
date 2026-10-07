@@ -113,6 +113,23 @@
 </head>
 <body class="is-home">
 
+<!-- ============================ LAUNCH SPLASH ============================ -->
+<!-- First open of the session: the mark assembles, one pass of light, then it
+     hands off to the masthead logo. Never waits on Firestore. -->
+<div class="splash" id="splash" hidden>
+    <div class="splash-mark">
+        <svg class="splash-rim" viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="56" pathLength="1"/>
+        </svg>
+        <div class="splash-logo">
+            <img src="iconnn.jpeg" alt="">
+            <span class="splash-gleam"></span>
+        </div>
+    </div>
+    <div class="splash-word">SHU BADNA <span>NEKOL</span></div>
+    <div class="splash-tag">دليلك الأول للمطاعم التي تستحق التجربة</div>
+</div>
+
 <!-- ============================ APP BAR ============================ -->
 <header class="appbar">
     <div class="appbar-inner shell">
@@ -144,7 +161,7 @@
 
         <div class="home-top">
             <a href="javascript:void(0);" onclick="window.openCategories && window.openCategories()" class="region-card">
-                <img class="region-img" src="https://lh3.googleusercontent.com/d/1doCOmMqmtbPIMdy4ZnvUx1pIsI3csgjl" alt="منطقة الضاحية">
+                <img class="region-img fade-img" src="https://lh3.googleusercontent.com/d/1doCOmMqmtbPIMdy4ZnvUx1pIsI3csgjl" alt="منطقة الضاحية">
                 <div class="region-body">
                     <span class="chip chip-accent">منطقة الضاحية</span>
                     <h2 class="region-title">EL DAHYE</h2>
@@ -173,6 +190,22 @@
                 <p class="editorial">الحياة صار إلها طعمة</p>
             </div>
         </div>
+
+        <!-- Saved restaurants, above the fold -->
+        <section class="home-cats" id="homeCats" hidden>
+            <div class="section-head">
+                <h2 class="section-title">محفوظاتك</h2>
+                <span class="section-sub">المطاعم اللي حفظتها</span>
+            </div>
+            <div class="home-cats-rail" id="homeSavedRail"></div>
+            <p class="home-saved-empty" id="homeSavedEmpty" hidden>
+                ما حفظت أي مطعم بعد — اضغط القلب بأي مطعم وتلقاه هون.
+            </p>
+            <button class="home-cats-more" type="button" onclick="window.openCategories && window.openCategories()">
+                كل الأقسام
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+        </section>
 
         <section class="install" id="installSection">
             <div class="install-title">
@@ -217,7 +250,7 @@
     <!-- ---------------- PAGE 3: RESTAURANTS ---------------- -->
     <div class="view-page" id="pageRestaurants">
         <div class="cat-strip">
-            <img id="categoryHeroImg" class="cat-strip-img" alt="">
+            <img id="categoryHeroImg" class="cat-strip-img fade-img" alt="">
             <div class="cat-strip-copy">
                 <div class="cat-strip-label">القسم المختار</div>
                 <h1 class="cat-strip-title" id="categoryHeroTitle">المطاعم</h1>
@@ -237,25 +270,28 @@
 
     <!-- ---------------- PAGE 4: RESTAURANT PROFILE ---------------- -->
     <div class="view-page" id="pageRestProfile">
-        <div class="profile-cover" id="profileCover" hidden>
+        <!-- Cover stands on its own: the photo, plus the save control tucked
+             into its corner. Identity sits below it, never on top of it. -->
+        <div class="profile-cover" id="profileCover">
             <img id="profileCoverImg" alt="">
+            <!-- Save + rating share one frosted chip in the photo's corner. -->
+            <div class="cover-actions">
+                <button class="fav-btn fav-btn--cover" id="profileFavBtn" type="button" aria-pressed="false" aria-label="أضف المطعم إلى المفضلة">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.7 10.6 19.4C5.4 14.7 2 11.6 2 7.9 2 5.1 4.2 3 7 3c1.6 0 3.1.7 4.1 1.9L12 5.4l.9-.5C13.9 3.7 15.4 3 17 3c2.8 0 5 2.1 5 4.9 0 3.7-3.4 6.8-8.6 11.5L12 20.7Z"/></svg>
+                </button>
+                <span class="profile-rating" id="profileRating" hidden></span>
+            </div>
         </div>
 
         <div class="profile-head">
             <div class="profile-logo">
                 <img id="profileLogo" alt="">
             </div>
-            <div class="profile-identity">
-                <div class="profile-badges">
-                    <span class="status is-open" id="profileStatus" hidden><i></i><span class="status-text"></span></span>
-                    <span class="profile-rating" id="profileRating" hidden></span>
-                    <button class="fav-btn" id="profileFavBtn" type="button" aria-pressed="false" aria-label="أضف المطعم إلى المفضلة">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.7 10.6 19.4C5.4 14.7 2 11.6 2 7.9 2 5.1 4.2 3 7 3c1.6 0 3.1.7 4.1 1.9L12 5.4l.9-.5C13.9 3.7 15.4 3 17 3c2.8 0 5 2.1 5 4.9 0 3.7-3.4 6.8-8.6 11.5L12 20.7Z"/></svg>
-                    </button>
-                </div>
-                <h1 class="profile-title" id="profileName">اسم المطعم</h1>
-                <p class="profile-desc" id="profileDesc">وصف المطعم</p>
+            <h1 class="profile-title" id="profileName">اسم المطعم</h1>
+            <div class="profile-badges">
+                <span class="status is-open" id="profileStatus" hidden><i></i><span class="status-text"></span></span>
             </div>
+            <p class="profile-desc" id="profileDesc">وصف المطعم</p>
         </div>
 
         <div class="profile-layout">
@@ -543,6 +579,20 @@
             <button class="btn btn-quiet" id="dialogCancel" type="button">إلغاء</button>
             <button class="btn btn-danger" id="dialogConfirm" type="button">تأكيد</button>
         </div>
+    </div>
+</div>
+
+<!-- ============================ CATEGORY FOOD MOMENT ============================ -->
+<!-- Full-screen overlay for the category signature. Navigation happens
+     underneath on the same frame — this never blocks anything. -->
+<div class="moment" id="momentLayer" hidden>
+    <div class="moment-scrim"></div>
+    <div class="moment-veil"></div>
+    <div class="moment-disc"><img id="momentImg" alt=""></div>
+    <div class="moment-art" id="momentArt"></div>
+    <div class="moment-title">
+        <span class="moment-title-ar" id="momentTitleAr"></span>
+        <span class="moment-title-en" id="momentTitleEn"></span>
     </div>
 </div>
 
