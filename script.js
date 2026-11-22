@@ -20,6 +20,12 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDIoVcSZQwj9M9X6kXSVGCiHkELDZvsB2Y",
@@ -38,7 +44,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const storage = getStorage(app);
-
+const auth = getAuth(app);
 
 const MAX_GALLERY_IMAGES = 20;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -2016,54 +2022,41 @@ function checkAdminAccess() {
 }
 
 
-function performAdminLogin() {
+async function performAdminLogin() {
+  const username = document.getElementById("loginUsername")?.value.trim();
+  const pass = document.getElementById("loginPassword")?.value;
 
-  const user =
-    document.getElementById(
-      "loginUsername"
-    )?.value;
-
-  const pass =
-    document.getElementById(
-      "loginPassword"
-    )?.value;
-
-
-  if (
-    user === "admin1" &&
-    pass === "70725"
-  ) {
-
-    sessionStorage.setItem(
-      "isAdminLoggedIn",
-      "true"
-    );
-
-
-    showPage("pageAdmin");
-
-  } else {
-
-    alert(
-      "اسم المستخدم أو كلمة المرور غير صحيحة"
-    );
-
+  if (!username || !pass) {
+    alert("يرجى إدخال اسم المستخدم وكلمة المرور");
+    return;
   }
 
+  const email = username.includes("@") ? username : username + "@shubadnanotlob.com";
+
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    showPage("pageAdmin");
+  } catch (error) {
+    console.error("Login error:", error);
+    alert("اسم المستخدم أو كلمة المرور غير صحيحة");
+  }
 }
 
-
-function logoutAdmin() {
-
-  sessionStorage.removeItem(
-    "isAdminLoggedIn"
-  );
-
-
+async function logoutAdmin() {
+  try {
+    await signOut(auth);
+  } catch (e) {
+    console.error(e);
+  }
   showPage("pageHome");
-
 }
 
+onAuthStateChanged(auth, (user) => {
+  const active = document.querySelector(".view-page.active");
+  if (!user && active && active.id === "pageAdmin") {
+    showPage("pageLogin");
+  }
+});
 
 // ============================================================
 // FILTER CATEGORIES
