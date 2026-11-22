@@ -4690,6 +4690,8 @@ let installPromptBusy = false;
 
 let installPromptBusy = false;
 
+let installPromptBusy = false;
+
 async function promptAndroidInstall() {
   const modal = document.getElementById('pwaModal');
 
