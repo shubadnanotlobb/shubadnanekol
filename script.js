@@ -4692,9 +4692,12 @@ let installPromptBusy = false;
 
 let installPromptBusy = false;
 
+let installPromptBusy = false;
+
 async function promptAndroidInstall() {
   const modal = document.getElementById('pwaModal');
 
+  // منع الضغط المتكرر
   if (installPromptBusy) return;
 
   const promptEvent = window.deferredPrompt;
@@ -4705,7 +4708,9 @@ async function promptAndroidInstall() {
   }
 
   installPromptBusy = true;
+  // الحدث بينستخدم مرة وحدة بس
   window.deferredPrompt = null;
+  // سكّر النافذة فوراً عشان ما تغطي الصفحة
   if (modal) modal.style.display = 'none';
 
   try {
