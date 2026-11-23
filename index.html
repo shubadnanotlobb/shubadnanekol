@@ -514,6 +514,31 @@
             <div class="stats-head"><span>المطعم</span><span>زيارات</span><span>أشخاص</span><span>واتساب</span></div>
             <div id="statsList"></div>
         </section>
+    </div>\
+    <!-- ---------------- PAGE 8: RESTAURANT STATS ---------------- -->
+    <div class="view-page" id="pageStatsRest">
+        <div class="section-head">
+            <h1 class="section-title" id="statsRestTitle">المطعم</h1>
+            <button class="btn btn-ghost btn-sm" type="button" onclick="window.loadRestaurantStats()">تحديث</button>
+        </div>
+        <div class="stats-summary" id="statsRestTotals"></div>
+
+        <section class="panel">
+            <div class="panel-head"><h3 class="panel-title">حسب الشهر</h3></div>
+            <div class="stats-head"><span>الشهر</span><span>زيارات</span><span>أشخاص</span><span>واتساب</span></div>
+            <div id="statsRestMonths"></div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">حسب الساعة</h3>
+                <input class="field-control" type="date" id="statsRestDay" onchange="window.renderStatsDay()" style="width:auto;min-height:40px">
+            </div>
+            <div class="stats-head stats-head--3"><span>الساعة</span><span>زيارات</span><span>واتساب</span></div>
+            <div id="statsRestHours"></div>
+        </section>
+
+        <button class="btn btn-danger btn-block" type="button" onclick="window.resetRestaurantStats()">تصفير إحصائيات هالمطعم</button>
     </div>
 </main>
 
