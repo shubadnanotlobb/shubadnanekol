@@ -9,10 +9,12 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  query,
-  orderBy
+query,
+  orderBy,
+  getDoc,
+  getDocs,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
 import {
   getStorage,
   ref,
@@ -625,6 +627,7 @@ const PAGE_TITLES = {
   pageRestProfile: "المطعم",
   pageLogin: "تسجيل الدخول",
   pageAdmin: "لوحة التحكم"
+  pageStats: "الاحصائيات"
 };
 
 function getPageTitle(pageId) {
@@ -697,7 +700,10 @@ function showPage(pageId, isBack = false) {
       renderRestaurantsList("", false);
     }
   }
-
+if (pageId === "pageStats") {
+    localStorage.setItem("parentPage", "pageAdmin");
+    if (auth.currentUser) loadStatsPage();
+  }
   window.scrollTo(0, 0);
 
   // Section headings settle in behind the page transition.
@@ -2053,9 +2059,10 @@ async function logoutAdmin() {
 
 onAuthStateChanged(auth, (user) => {
   const active = document.querySelector(".view-page.active");
-  if (!user && active && active.id === "pageAdmin") {
+  if (!user && active && (active.id === "pageAdmin" || active.id === "pageStats")) {
     showPage("pageLogin");
   }
+  if (user && active && active.id === "pageStats") loadStatsPage();
 });
 
 // ============================================================
@@ -3538,6 +3545,7 @@ function renderRestaurantsList(
 // ============================================================
 
 function fillRestaurantProfileDOM(r) {
+  currentProfileId = r.id || "";
   const profileLogo = document.getElementById("profileLogo");
   const profileName = document.getElementById("profileName");
   const profileDesc = document.getElementById("profileDesc");
@@ -3689,7 +3697,7 @@ function sendSecureOrderWhatsApp() {
 function openRestaurantProfile(r, event) {
   // حفظ بيانات المطعم الحالي في الـ localStorage لتفادي فقدانها عند عمل Refresh
   localStorage.setItem("currentRestaurantProfile", JSON.stringify(r));
-
+trackRestaurantView(r.id);
   const sourceImg =
     event && event.currentTarget
       ? event.currentTarget.querySelector(".rc-cover")
@@ -4915,7 +4923,13 @@ function initDesignSystem() {
     regionImg.dataset.wired = "1";
     regionImg.addEventListener("error", fixRegionImage);
   }
-
+/* --- WhatsApp click counter on the restaurant profile --- */
+  const waBtn = document.getElementById("profileContactBtn");
+  if (waBtn) {
+    waBtn.addEventListener("click", () => {
+      if (waBtn.getAttribute("href") !== "#") trackWhatsAppClick(currentProfileId);
+    });
+  }
   /* --- Launch screen: the first open of this session only --- */
   initSplash();
 
@@ -4964,3 +4978,123 @@ window.addEventListener('DOMContentLoaded', () => {
         }, 800);
     }
 });
+window.addEventListener("DOMContentLoaded", trackSiteVisit);
+// ============================================================
+// STATS: tracking + admin stats page
+// ============================================================
+
+let currentProfileId = "";
+
+async function trackSiteVisit() {
+  try {
+    // مرة وحدة لكل جلسة، عشان الـ Refresh ما يزيد العدد
+    if (sessionStorage.getItem("shu_visit_counted") === "1") return;
+    sessionStorage.setItem("shu_visit_counted", "1");
+
+    const isNew = localStorage.getItem("shu_seen_before") !== "1";
+    if (isNew) localStorage.setItem("shu_seen_before", "1");
+
+    await setDoc(doc(db, "stats", "site"), {
+      visits: increment(1),
+      uniqueVisitors: increment(isNew ? 1 : 0)
+    }, { merge: true });
+  } catch (e) {
+    console.warn("trackSiteVisit:", e);
+  }
+}
+
+async function trackRestaurantView(id) {
+  if (!id) return;
+  try {
+    const key = "shu_seen_restaurants";
+    let seen = [];
+    try { seen = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) {}
+    const isNew = seen.indexOf(id) === -1;
+    if (isNew) {
+      seen.push(id);
+      localStorage.setItem(key, JSON.stringify(seen));
+    }
+    await setDoc(doc(db, "stats_restaurants", id), {
+      views: increment(1),
+      uniqueViews: increment(isNew ? 1 : 0)
+    }, { merge: true });
+  } catch (e) {
+    console.warn("trackRestaurantView:", e);
+  }
+}
+
+async function trackWhatsAppClick(id) {
+  if (!id) return;
+  try {
+    await setDoc(doc(db, "stats_restaurants", id), {
+      whatsappClicks: increment(1)
+    }, { merge: true });
+  } catch (e) {
+    console.warn("trackWhatsAppClick:", e);
+  }
+}
+
+function openStatsPage() {
+  if (!auth.currentUser) {
+    showPage("pageLogin");
+    return;
+  }
+  showPage("pageStats");
+}
+
+async function loadStatsPage() {
+  const summary = document.getElementById("statsSummary");
+  const list = document.getElementById("statsList");
+  if (!summary || !list || !auth.currentUser) return;
+
+  list.innerHTML = '<div class="admin-list-note">جاري التحميل...</div>';
+
+  try {
+    const [siteSnap, restSnap] = await Promise.all([
+      getDoc(doc(db, "stats", "site")),
+      getDocs(collection(db, "stats_restaurants"))
+    ]);
+
+    const site = siteSnap.exists() ? siteSnap.data() : {};
+    const byId = {};
+    restSnap.forEach(d => { byId[d.id] = d.data(); });
+
+    const rows = allRestaurants.map(r => {
+      const s = byId[r.id] || {};
+      return {
+        name: r.name || "",
+        views: s.views || 0,
+        unique: s.uniqueViews || 0,
+        wa: s.whatsappClicks || 0
+      };
+    }).sort((a, b) => b.views - a.views);
+
+    const totalViews = rows.reduce((n, r) => n + r.views, 0);
+    const totalWa = rows.reduce((n, r) => n + r.wa, 0);
+
+    const card = (num, label) =>
+      `<div class="stat-card"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
+
+    summary.innerHTML =
+      card(site.visits || 0, "زيارات الموقع") +
+      card(site.uniqueVisitors || 0, "أشخاص فتحوا الموقع") +
+      card(totalViews, "فتحوا مطاعم") +
+      card(totalWa, "ضغطوا واتساب");
+
+    list.innerHTML = rows.length
+      ? rows.map(r =>
+          `<div class="stats-row">
+            <span class="stats-name">${escapeHtml(r.name)}</span>
+            <span>${r.views}</span>
+            <span>${r.unique}</span>
+            <span>${r.wa}</span>
+          </div>`).join("")
+      : '<div class="admin-list-note">ما في مطاعم بعد.</div>';
+  } catch (e) {
+    console.error("loadStatsPage:", e);
+    list.innerHTML = '<div class="admin-list-note">تعذّر تحميل الإحصائيات. تأكد من قواعد Firestore.</div>';
+  }
+}
+
+window.openStatsPage = openStatsPage;
+window.loadStatsPage = loadStatsPage;
