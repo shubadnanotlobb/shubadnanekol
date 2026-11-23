@@ -3672,3 +3672,14 @@ body.is-entering #pageHome .install {
     gap: var(--sp-5);
   }
 }
+.stats-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-4)}
+.stat-num{font-size:var(--t-display);font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat-label{font-size:var(--t-xs);color:var(--text-3);margin-top:4px}
+.stats-head,.stats-row{display:grid;grid-template-columns:minmax(0,1fr) 56px 56px 56px;gap:var(--sp-2);align-items:center;text-align:center}
+.stats-head{font-size:var(--t-2xs);color:var(--text-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.stats-row{padding-block:var(--sp-3);border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.stats-row:last-child{border-bottom:0}
+.stats-head span:first-child,.stats-row .stats-name{text-align:start}
+.stats-row .stats-name{font-size:var(--t-sm);font-weight:500;overflow-wrap:anywhere}
+@media (min-width:900px){.stats-summary{grid-template-columns:repeat(4,minmax(0,1fr))}}
