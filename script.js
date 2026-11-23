@@ -3179,6 +3179,7 @@ function toggleFavorite(id) {
 
   syncFavoriteUI(id);
   renderHomeSaved();
+  trackFavorite(id, nowFavorite);
   return nowFavorite;
 }
 
@@ -5100,7 +5101,26 @@ async function trackWhatsAppClick(id) {
     console.warn("trackWhatsAppClick:", e);
   }
 }
+async function trackFavorite(id, added) {
+  if (!id || isAdminDevice()) return;
+  try {
+    let counted = [];
+    try { counted = JSON.parse(localStorage.getItem("shu_fav_counted") || "[]"); } catch (e) {}
+    const has = counted.indexOf(id) !== -1;
+    if (added && has) return;
+    if (!added && !has) return;
 
+    if (added) counted.push(id);
+    else counted = counted.filter((x) => x !== id);
+    localStorage.setItem("shu_fav_counted", JSON.stringify(counted));
+
+    await setDoc(doc(db, "stats_restaurants", id), {
+      favorites: increment(added ? 1 : -1)
+    }, { merge: true });
+  } catch (e) {
+    console.warn("trackFavorite:", e);
+  }
+}
 function statCard(num, label) {
   return '<div class="stat-card"><div class="stat-num">' + num +
     '</div><div class="stat-label">' + label + '</div></div>';
@@ -5207,8 +5227,8 @@ async function loadRestaurantStats() {
       statCard(todayViews, "زيارات اليوم") +
       statCard(main.views || 0, "كل الزيارات") +
       statCard(main.uniqueViews || 0, "أشخاص") +
-      statCard(main.whatsappClicks || 0, "ضغطات واتساب");
-
+      statCard(main.whatsappClicks || 0, "ضغطات واتساب") +
+      statCard(Math.max(0, main.favorites || 0), "❤️ Favorite");
     const byMonth = {};
     statsRestRows.forEach((r) => {
       const m = r.month || "";
