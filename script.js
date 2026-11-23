@@ -4986,14 +4986,50 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 window.addEventListener("DOMContentLoaded", trackSiteVisit);
 // ============================================================
-// STATS: tracking + admin stats page
+// STATS v2: hourly buckets + admin exclusion + per-restaurant page
 // ============================================================
 
 let currentProfileId = "";
+let statsRestId = "";
+let statsRestName = "";
+let statsRestRows = [];
+
+const MONTH_NAMES = ["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
+
+function isAdminDevice() {
+  try { return localStorage.getItem("shu_is_admin") === "1"; } catch (e) { return false; }
+}
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    try { localStorage.setItem("shu_is_admin", "1"); } catch (e) {}
+  }
+  const active = document.querySelector(".view-page.active");
+  if (!active || active.id !== "pageStatsRest") return;
+  if (!user) showPage("pageLogin");
+  else if (statsRestId) loadRestaurantStats();
+  else showPage("pageStats");
+});
+
+function beirutNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Beirut",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", hourCycle: "h23"
+  }).formatToParts(new Date());
+  const get = (t) => parts.find((p) => p.type === t).value;
+  const day = get("year") + "-" + get("month") + "-" + get("day");
+  const hour = String(Number(get("hour")) % 24).padStart(2, "0");
+  return { day: day, month: day.slice(0, 7), hour: hour };
+}
+
+function bucketRef(id, t) {
+  return doc(db, "stats_restaurants", id, "hours", t.day + "_" + t.hour);
+}
 
 async function trackSiteVisit() {
   try {
-    // مرة وحدة لكل جلسة، عشان الـ Refresh ما يزيد العدد
+    if (isAdminDevice()) return;
     if (sessionStorage.getItem("shu_visit_counted") === "1") return;
     sessionStorage.setItem("shu_visit_counted", "1");
 
@@ -5010,34 +5046,64 @@ async function trackSiteVisit() {
 }
 
 async function trackRestaurantView(id) {
-  if (!id) return;
+  if (!id || isAdminDevice()) return;
   try {
-    const key = "shu_seen_restaurants";
+    const t = beirutNow();
+
     let seen = [];
-    try { seen = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) {}
+    try { seen = JSON.parse(localStorage.getItem("shu_seen_restaurants") || "[]"); } catch (e) {}
     const isNew = seen.indexOf(id) === -1;
     if (isNew) {
       seen.push(id);
-      localStorage.setItem(key, JSON.stringify(seen));
+      localStorage.setItem("shu_seen_restaurants", JSON.stringify(seen));
     }
-    await setDoc(doc(db, "stats_restaurants", id), {
-      views: increment(1),
-      uniqueViews: increment(isNew ? 1 : 0)
-    }, { merge: true });
+
+    let rm = [];
+    try { rm = JSON.parse(localStorage.getItem("shu_seen_rm") || "[]"); } catch (e) {}
+    const tag = id + "|" + t.month;
+    const newThisMonth = rm.indexOf(tag) === -1;
+    if (newThisMonth) {
+      rm.push(tag);
+      localStorage.setItem("shu_seen_rm", JSON.stringify(rm));
+    }
+
+    await Promise.all([
+      setDoc(doc(db, "stats_restaurants", id), {
+        views: increment(1),
+        uniqueViews: increment(isNew ? 1 : 0)
+      }, { merge: true }),
+      setDoc(bucketRef(id, t), {
+        views: increment(1),
+        uniqueViews: increment(newThisMonth ? 1 : 0),
+        day: t.day, month: t.month, hour: t.hour
+      }, { merge: true })
+    ]);
   } catch (e) {
     console.warn("trackRestaurantView:", e);
   }
 }
 
 async function trackWhatsAppClick(id) {
-  if (!id) return;
+  if (!id || isAdminDevice()) return;
   try {
-    await setDoc(doc(db, "stats_restaurants", id), {
-      whatsappClicks: increment(1)
-    }, { merge: true });
+    const t = beirutNow();
+    await Promise.all([
+      setDoc(doc(db, "stats_restaurants", id), {
+        whatsappClicks: increment(1)
+      }, { merge: true }),
+      setDoc(bucketRef(id, t), {
+        whatsappClicks: increment(1),
+        day: t.day, month: t.month, hour: t.hour
+      }, { merge: true })
+    ]);
   } catch (e) {
     console.warn("trackWhatsAppClick:", e);
   }
+}
+
+function statCard(num, label) {
+  return '<div class="stat-card"><div class="stat-num">' + num +
+    '</div><div class="stat-label">' + label + '</div></div>';
 }
 
 function openStatsPage() {
@@ -5063,11 +5129,12 @@ async function loadStatsPage() {
 
     const site = siteSnap.exists() ? siteSnap.data() : {};
     const byId = {};
-    restSnap.forEach(d => { byId[d.id] = d.data(); });
+    restSnap.forEach((d) => { byId[d.id] = d.data(); });
 
-    const rows = allRestaurants.map(r => {
+    const rows = allRestaurants.map((r) => {
       const s = byId[r.id] || {};
       return {
+        id: r.id,
         name: r.name || "",
         views: s.views || 0,
         unique: s.uniqueViews || 0,
@@ -5078,23 +5145,18 @@ async function loadStatsPage() {
     const totalViews = rows.reduce((n, r) => n + r.views, 0);
     const totalWa = rows.reduce((n, r) => n + r.wa, 0);
 
-    const card = (num, label) =>
-      `<div class="stat-card"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
-
     summary.innerHTML =
-      card(site.visits || 0, "زيارات الموقع") +
-      card(site.uniqueVisitors || 0, "أشخاص فتحوا الموقع") +
-      card(totalViews, "فتحوا مطاعم") +
-      card(totalWa, "ضغطوا واتساب");
+      statCard(site.visits || 0, "زيارات الموقع") +
+      statCard(site.uniqueVisitors || 0, "أشخاص فتحوا الموقع") +
+      statCard(totalViews, "فتحوا مطاعم") +
+      statCard(totalWa, "ضغطوا واتساب");
 
     list.innerHTML = rows.length
-      ? rows.map(r =>
-          `<div class="stats-row">
-            <span class="stats-name">${escapeHtml(r.name)}</span>
-            <span>${r.views}</span>
-            <span>${r.unique}</span>
-            <span>${r.wa}</span>
-          </div>`).join("")
+      ? rows.map((r) =>
+          '<button type="button" class="stats-row stats-row--btn" onclick="window.openRestaurantStats(\'' + r.id + '\')">' +
+            '<span class="stats-name">' + escapeHtml(r.name) + '</span>' +
+            '<span>' + r.views + '</span><span>' + r.unique + '</span><span>' + r.wa + '</span>' +
+          '</button>').join("")
       : '<div class="admin-list-note">ما في مطاعم بعد.</div>';
   } catch (e) {
     console.error("loadStatsPage:", e);
@@ -5102,5 +5164,124 @@ async function loadStatsPage() {
   }
 }
 
+function openRestaurantStats(id) {
+  if (!auth.currentUser) {
+    showPage("pageLogin");
+    return;
+  }
+  const r = allRestaurants.find((x) => x.id === id);
+  statsRestId = id;
+  statsRestName = r ? (r.name || "") : "";
+  localStorage.setItem("parentPage", "pageStats");
+  const dayInput = document.getElementById("statsRestDay");
+  if (dayInput) dayInput.value = beirutNow().day;
+  showPage("pageStatsRest");
+  loadRestaurantStats();
+}
+
+async function loadRestaurantStats() {
+  const title = document.getElementById("statsRestTitle");
+  const totals = document.getElementById("statsRestTotals");
+  const months = document.getElementById("statsRestMonths");
+  const dayInput = document.getElementById("statsRestDay");
+  if (!title || !totals || !months || !statsRestId || !auth.currentUser) return;
+
+  title.textContent = statsRestName;
+  months.innerHTML = '<div class="admin-list-note">جاري التحميل...</div>';
+
+  try {
+    const [mainSnap, hoursSnap] = await Promise.all([
+      getDoc(doc(db, "stats_restaurants", statsRestId)),
+      getDocs(collection(db, "stats_restaurants", statsRestId, "hours"))
+    ]);
+
+    const main = mainSnap.exists() ? mainSnap.data() : {};
+    statsRestRows = hoursSnap.docs.map((d) => d.data());
+
+    const today = beirutNow().day;
+    const todayViews = statsRestRows
+      .filter((r) => r.day === today)
+      .reduce((n, r) => n + (r.views || 0), 0);
+
+    totals.innerHTML =
+      statCard(todayViews, "زيارات اليوم") +
+      statCard(main.views || 0, "كل الزيارات") +
+      statCard(main.uniqueViews || 0, "أشخاص") +
+      statCard(main.whatsappClicks || 0, "ضغطات واتساب");
+
+    const byMonth = {};
+    statsRestRows.forEach((r) => {
+      const m = r.month || "";
+      if (!m) return;
+      const o = byMonth[m] || (byMonth[m] = { v: 0, u: 0, w: 0 });
+      o.v += r.views || 0;
+      o.u += r.uniqueViews || 0;
+      o.w += r.whatsappClicks || 0;
+    });
+
+    const keys = Object.keys(byMonth).sort().reverse();
+    months.innerHTML = keys.length
+      ? keys.map((m) => {
+          const o = byMonth[m];
+          const label = MONTH_NAMES[Number(m.slice(5)) - 1] + " " + m.slice(0, 4);
+          return '<div class="stats-row"><span class="stats-name">' + label +
+            '</span><span>' + o.v + '</span><span>' + o.u + '</span><span>' + o.w + '</span></div>';
+        }).join("")
+      : '<div class="admin-list-note">ما في تفاصيل شهرية بعد.</div>';
+
+    if (dayInput && !dayInput.value) dayInput.value = today;
+    renderStatsDay();
+  } catch (e) {
+    console.error("loadRestaurantStats:", e);
+    months.innerHTML = '<div class="admin-list-note">تعذّر التحميل. تأكد من قواعد Firestore.</div>';
+  }
+}
+
+function renderStatsDay() {
+  const dayInput = document.getElementById("statsRestDay");
+  const box = document.getElementById("statsRestHours");
+  if (!dayInput || !box) return;
+
+  const rows = statsRestRows
+    .filter((r) => r.day === dayInput.value)
+    .sort((a, b) => String(a.hour).localeCompare(String(b.hour)));
+
+  box.innerHTML = rows.length
+    ? rows.map((r) =>
+        '<div class="stats-row stats-row--3"><span class="stats-name">' +
+        format12HourTime(r.hour + ":00") + '</span><span>' + (r.views || 0) +
+        '</span><span>' + (r.whatsappClicks || 0) + '</span></div>').join("")
+    : '<div class="admin-list-note">ما في زيارات بهاد اليوم.</div>';
+}
+
+async function resetRestaurantStats() {
+  if (!statsRestId || !auth.currentUser) return;
+
+  const ok = await showConfirm(
+    "بدك تصفّر كل إحصائيات هالمطعم (الأيام والساعات والأشهر)؟ ما في رجعة.",
+    "تصفير الإحصائيات",
+    "تصفير"
+  );
+  if (!ok) return;
+
+  try {
+    const snap = await getDocs(collection(db, "stats_restaurants", statsRestId, "hours"));
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 25) {
+      await Promise.all(docs.slice(i, i + 25).map((d) => deleteDoc(d.ref)));
+    }
+    await deleteDoc(doc(db, "stats_restaurants", statsRestId));
+    showToast("تم تصفير إحصائيات المطعم", "success");
+    loadRestaurantStats();
+  } catch (e) {
+    console.error("resetRestaurantStats:", e);
+    showToast("تعذّر التصفير. تأكد من قواعد Firestore.", "error");
+  }
+}
+
 window.openStatsPage = openStatsPage;
 window.loadStatsPage = loadStatsPage;
+window.openRestaurantStats = openRestaurantStats;
+window.loadRestaurantStats = loadRestaurantStats;
+window.renderStatsDay = renderStatsDay;
+window.resetRestaurantStats = resetRestaurantStats;
