@@ -626,7 +626,7 @@ const PAGE_TITLES = {
   pageRestaurants: "المطاعم",
   pageRestProfile: "المطعم",
   pageLogin: "تسجيل الدخول",
-  pageAdmin: "لوحة التحكم"
+  pageAdmin: "لوحة التحكم" ,
   pageStats: "الاحصائيات"
 };
 
