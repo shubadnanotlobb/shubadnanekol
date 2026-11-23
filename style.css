@@ -3683,3 +3683,6 @@ body.is-entering #pageHome .install {
 .stats-head span:first-child,.stats-row .stats-name{text-align:start}
 .stats-row .stats-name{font-size:var(--t-sm);font-weight:500;overflow-wrap:anywhere}
 @media (min-width:900px){.stats-summary{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stats-row--btn{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;cursor:pointer}
+.stats-row--btn:active{background:var(--surface-2)}
+.stats-head--3,.stats-row--3{grid-template-columns:minmax(0,1fr) 64px 64px}
