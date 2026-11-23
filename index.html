@@ -354,7 +354,7 @@
         <div class="admin-grid">
 
             <div class="admin-col">
-
+<button class="btn btn-primary btn-lg btn-block" type="button" onclick="window.openStatsPage()" style="margin-bottom:16px">📊 الإحصائيات</button>
                 <!-- Category form -->
                 <section class="panel">
                     <div class="panel-head">
@@ -499,7 +499,22 @@
             </aside>
         </div>
     </div>
-
+<!-- ---------------- PAGE 7: STATS ---------------- -->
+    <div class="view-page" id="pageStats">
+        <div class="section-head">
+            <h1 class="section-title">الإحصائيات</h1>
+            <button class="btn btn-ghost btn-sm" type="button" onclick="window.loadStatsPage()">تحديث</button>
+        </div>
+        <div class="stats-summary" id="statsSummary"></div>
+        <section class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">المطاعم</h3>
+                <span class="section-sub">مرتبة حسب الزيارات</span>
+            </div>
+            <div class="stats-head"><span>المطعم</span><span>زيارات</span><span>أشخاص</span><span>واتساب</span></div>
+            <div id="statsList"></div>
+        </section>
+    </div>
 </main>
 
 <!-- ============================ FOOTER ============================ -->
