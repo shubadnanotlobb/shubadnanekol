@@ -3628,7 +3628,13 @@ function fillRestaurantProfileDOM(r) {
   }
 
   if (contactBtn) {
-    contactBtn.href = r.phone ? `https://wa.me/${r.phone}` : "#";
+   if (r.phone) {
+      const waText = "Hello,\nI'm ordering through the SHU BADNA NEKOL site.\nI'd like to place an order.";
+      const waPhone = String(r.phone).replace(/\D/g, "");
+      contactBtn.href = `https://wa.me/${waPhone}?text=${encodeURIComponent(waText)}`;
+    } else {
+      contactBtn.href = "#";
+    }
     contactBtn.hidden = !hasPhone;
   }
 
