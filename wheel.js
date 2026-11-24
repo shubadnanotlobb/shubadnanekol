@@ -84,7 +84,7 @@ function mountModal() {
   m.innerHTML =
     '<div class="wl-card" role="dialog" aria-label="دولاب الحظ">' +
       '<button type="button" class="wl-close" data-wl="close" aria-label="إغلاق">×</button>' +
-    '<button type="button" class="wl-mute" id="wlMute" data-wl="mute" aria-label="الصوت">🔊</button>' +
+      '<button type="button" class="wl-mute" id="wlMute" data-wl="mute" aria-label="الصوت">🔊</button>' +
       '<h2 class="wl-title">دولاب الحظ</h2>' +
       '<p class="wl-sub" id="wlSub">لف الدولاب وشوف شو رح تاكل اليوم</p>' +
       '<div class="wl-stage">' +
@@ -115,6 +115,7 @@ function mountModal() {
     else if (act === "mute") {
       muted = !muted;
       try { localStorage.setItem("wl_muted", muted ? "1" : "0"); } catch (e) {}
+      if (muted) stopWin();
       updateMuteBtn();
     }
   });
@@ -198,7 +199,6 @@ function draw() {
 
   /* segments */
   const badge = Math.max(28, Math.min(66, R * seg * 0.8));
-  const fontSize = Math.max(11, Math.min(15, badge * 0.4));
 
   for (let i = 0; i < n; i++) {
     const a0 = rot + i * seg;
@@ -222,9 +222,8 @@ function draw() {
     ctx.translate(c, c);
     ctx.rotate(a0 + seg / 2);
 
-    const bx = R - 10 - badge / 2;
+    const bx = R - 12 - badge / 2;
     drawBadge(ctx, bx, badge, items[i].img, pal[0]);
-    
     ctx.restore();
   }
 
@@ -308,6 +307,7 @@ async function openWheel() {
 
 function closeWheel() {
   if (spinning) return;
+  stopWin();
   const m = $("wlModal");
   if (m) m.hidden = true;
   document.body.style.overflow = "";
@@ -339,7 +339,7 @@ function spin() {
     rot = start + delta * (1 - Math.pow(1 - p, 4));
     blink = Math.floor((now - t0) / 140) % 2;
     const cur = Math.floor(((((-Math.PI / 2 - rot) % TAU) + TAU) % TAU) / seg);
-    if (cur !== lastSeg && now - lastTick > 35) { tick(); lastTick = now; }
+    if (cur !== lastSeg && now - lastTick > 55) { tick(); lastTick = now; }
     lastSeg = cur;
     draw();
     if (p < 1) requestAnimationFrame(frame);
@@ -369,8 +369,7 @@ function finish(idx) {
   }
 
   $("wlResult").hidden = false;
-  winSound();
-  winSound();
+  playWin();
   try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
 }
 
@@ -431,35 +430,36 @@ function tick() {
   o.start(t);
   o.stop(t + 0.08);
 }
-function bell(freq, start) {
-  tone(freq, start, 0.9, "sine", 0.16);
-  tone(freq * 2, start, 0.6, "sine", 0.05);
-  tone(freq * 3, start, 0.35, "sine", 0.025);
+
+const winSnd = new Audio("spin.mp3");
+winSnd.preload = "auto";
+
+function unlockWin() {
+  try {
+    winSnd.muted = true;
+    const p = winSnd.play();
+    const done = () => { winSnd.pause(); winSnd.currentTime = 0; winSnd.muted = false; };
+    if (p && p.then) p.then(done).catch(() => { winSnd.muted = false; });
+    else done();
+  } catch (e) {}
 }
 
-function winSound() {
-  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(f, i * 0.12));
-}
-
-const spinSnd = new Audio("spin.mp3");
-spinSnd.preload = "auto";
-
-function playSpin() {
+function playWin() {
   if (muted) return;
   try {
-    spinSnd.currentTime = 0;
-    const p = spinSnd.play();
+    winSnd.currentTime = 0;
+    const p = winSnd.play();
     if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
-function stopSpin() {
-  try { spinSnd.pause(); } catch (e) {}
+function stopWin() {
+  try { winSnd.pause(); } catch (e) {}
 }
+
 function updateMuteBtn() {
   const b = $("wlMute");
   if (b) b.textContent = muted ? "🔇" : "🔊";
 }
-
 
 mountEntry();
