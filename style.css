@@ -3711,3 +3711,4 @@ body.has-menu header.appbar .appbar-menu{display:flex!important}
 body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
 .drawer{right:0!important;left:auto!important;border-left:1px solid var(--line-strong)!important;border-right:0!important;transform:translateX(100%)!important;width:min(70vw,280px)!important}
 .drawer.is-open{transform:none!important}
+header.appbar .appbar-menu{left:auto!important;right:12px!important;inset-inline-start:12px!important;inset-inline-end:auto!important}
