@@ -432,13 +432,15 @@ function tick() {
   o.stop(t + 0.08);
 }
 
-const winSnd = new Audio("win.mp3");
-winSnd.preload = "auto";
+/* ---------------- win sound (iPhone-safe) ----------------
+   iPhone only lets a sound start from a tap. So on every SPIN tap we start
+   the winner's sound (and the default one as a backup) silently on loop.
+   When the wheel stops we un-mute the right one and play it from the start.
+   Each sound has its own player, so we never swap files mid-way. */
 
-/* iPhone only allows sound that starts from a tap. So on every SPIN tap we
-   start the clip silently (looping), and when the wheel stops we un-mute it
-   and play it from the start. It never has to "start" without a tap. */
 const DEFAULT_SOUND = "win.mp3";
+const sndPool = {};
+let curSnd = null;
 
 function soundFor(item) {
   const s = String((item && item.sound) || "").trim();
@@ -447,45 +449,68 @@ function soundFor(item) {
   return s.replace(/^\/+/, "");
 }
 
-winSnd.addEventListener("error", () => {
-  if (!/win\.mp3$/.test(winSnd.getAttribute("src") || "")) winSnd.src = DEFAULT_SOUND;
-});
+function fullUrl(src) {
+  try { return new URL(src || DEFAULT_SOUND, document.baseURI).href; } catch (e) { return DEFAULT_SOUND; }
+}
 
-function unlockWin(src) {
+function getSnd(src) {
+  const url = fullUrl(src);
+  let el = sndPool[url];
+  if (!el) {
+    el = new Audio();
+    el.preload = "auto";
+    el.addEventListener("error", () => { el._bad = true; });
+    el.src = url;
+    sndPool[url] = el;
+  }
+  return el;
+}
+
+function startSilent(el) {
+  try { el.loop = true; el.muted = true; } catch (e) {}
+  try { if (el.readyState > 0) el.currentTime = 0; } catch (e) {}
   try {
-    const full = new URL(src || DEFAULT_SOUND, document.baseURI).href;
-    if (winSnd.src !== full) winSnd.src = full;
-  } catch (e) {}
-  try { winSnd.loop = true; winSnd.muted = true; } catch (e) {}
-  // Safari throws if you seek before the new file has loaded, so only seek
-  // when it is safe. Each step has its own try, so play() always runs.
-  try { if (winSnd.readyState > 0) winSnd.currentTime = 0; } catch (e) {}
-  try {
-    const p = winSnd.play();
+    const p = el.play();
     if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
+function unlockWin(src) {
+  const def = getSnd(DEFAULT_SOUND);
+  curSnd = getSnd(src);
+  startSilent(def);
+  if (curSnd !== def) startSilent(curSnd);
+}
+
 function playWin() {
-  try { winSnd.loop = false; } catch (e) {}
-  try { winSnd.currentTime = 0; } catch (e) {}
+  const def = getSnd(DEFAULT_SOUND);
+  const el = curSnd && !curSnd._bad && curSnd.readyState >= 2 ? curSnd : def;
+
+  Object.keys(sndPool).forEach((k) => {
+    const o = sndPool[k];
+    if (o !== el) {
+      try { o.pause(); o.loop = false; o.muted = false; } catch (e) {}
+    }
+  });
+
+  try { el.loop = false; } catch (e) {}
+  try { el.currentTime = 0; } catch (e) {}
   if (muted) {
-    try { winSnd.pause(); } catch (e) {}
+    try { el.pause(); } catch (e) {}
     return;
   }
   try {
-    winSnd.muted = false;
-    const p = winSnd.play();
+    el.muted = false;
+    const p = el.play();
     if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
 function stopWin() {
-  try {
-    winSnd.pause();
-    winSnd.loop = false;
-    winSnd.muted = false;
-  } catch (e) {}
+  Object.keys(sndPool).forEach((k) => {
+    const o = sndPool[k];
+    try { o.pause(); o.loop = false; o.muted = false; } catch (e) {}
+  });
 }
 
 /* ---------------- confetti / fireworks ---------------- */
