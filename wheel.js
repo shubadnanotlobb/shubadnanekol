@@ -1,6 +1,6 @@
 import { getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-  getFirestore, collection, getDocs
+  getFirestore, collection, getDocs, doc, getDoc, setDoc, query, where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const db = getFirestore(getApp());
@@ -270,7 +270,7 @@ async function loadItems() {
         const y = b.order != null ? Number(b.order) : 999;
         return x - y;
       })
-      .map((c) => ({ id: c.id, name: nameOf(c), img: c.imgUrl || "", raw: c }));
+      .map((c) => ({ id: c.id, name: nameOf(c), img: c.imgUrl || "", sound: c.soundUrl || "", raw: c }));
     loaded = items.length > 0;
     items.forEach((it) => getImg(it.img));
     return loaded;
@@ -317,13 +317,13 @@ function spin() {
   if (spinning || !items.length) return;
   spinning = true;
   audio();
-  unlockWin();
   $("wlResult").hidden = true;
   $("wlSpin").disabled = true;
 
   const n = items.length;
   const seg = TAU / n;
   const idx = Math.floor(Math.random() * n);
+  unlockWin(soundFor(items[idx]));
   const jitter = (Math.random() - 0.5) * seg * 0.7;
   const target = -Math.PI / 2 - (idx + 0.5) * seg + jitter;
   const delta =
@@ -438,8 +438,23 @@ winSnd.preload = "auto";
 /* iPhone only allows sound that starts from a tap. So on every SPIN tap we
    start the clip silently (looping), and when the wheel stops we un-mute it
    and play it from the start. It never has to "start" without a tap. */
-function unlockWin() {
+const DEFAULT_SOUND = "win.mp3";
+
+function soundFor(item) {
+  const s = String((item && item.sound) || "").trim();
+  if (!s) return DEFAULT_SOUND;
+  if (/^https?:\/\//i.test(s)) return s;
+  return s.replace(/^\/+/, "");
+}
+
+winSnd.addEventListener("error", () => {
+  if (!/win\.mp3$/.test(winSnd.getAttribute("src") || "")) winSnd.src = DEFAULT_SOUND;
+});
+
+function unlockWin(src) {
   try {
+    const full = new URL(src || DEFAULT_SOUND, document.baseURI).href;
+    if (winSnd.src !== full) winSnd.src = full;
     winSnd.loop = true;
     winSnd.muted = true;
     winSnd.currentTime = 0;
@@ -576,6 +591,90 @@ function confetti() {
   }
   requestAnimationFrame(frame);
 }
+
+/* ---------------- admin: per-category sound ---------------- */
+
+function ensureSoundField() {
+  if ($("adminCatSound")) return;
+  const img = $("adminCatImg");
+  const grp = img && img.closest(".admin-form-group");
+  if (!grp) return;
+
+  const box = document.createElement("div");
+  box.className = "field admin-form-group";
+  box.innerHTML =
+    '<label class="field-label" for="adminCatSound">صوت القسم عند الفوز (اختياري)</label>' +
+    '<input class="field-control" type="text" id="adminCatSound" placeholder="مثال: pizza.mp3 أو رابط مباشر" dir="ltr">' +
+    '<div class="upload-help-text">اكتب اسم ملف الصوت اللي رفعته على GitHub. إذا تركته فاضي بيشتغل الصوت العادي.</div>';
+  grp.after(box);
+}
+
+(function hookAdmin() {
+  ensureSoundField();
+
+  const origSave = window.saveCategoryToFirebase;
+  if (typeof origSave === "function") {
+    window.saveCategoryToFirebase = async function () {
+      ensureSoundField();
+      const sound = (($("adminCatSound") || {}).value || "").trim();
+      const docId = ($("editCatDocId") || {}).value || "";
+      const nameAr = (($("adminCatAr") || {}).value || "").trim();
+      const nameEn = (($("adminCatEn") || {}).value || "").trim();
+
+      const out = await origSave.apply(this, arguments);
+
+      if (!nameAr || !nameEn) return out;
+      if (($("adminCatAr") || {}).value) return out; // not saved (form still full)
+
+      try {
+        let id = docId;
+        if (!id) {
+          const snap = await getDocs(query(collection(db, "categories"), where("nameAr", "==", nameAr)));
+          let best = null;
+          let bestT = -1;
+          snap.docs.forEach((d) => {
+            const c = d.data().createdAt;
+            const t = c && c.toMillis ? c.toMillis() : 0;
+            if (t >= bestT) { best = d; bestT = t; }
+          });
+          id = best ? best.id : "";
+        }
+        if (id) await setDoc(doc(db, "categories", id), { soundUrl: sound }, { merge: true });
+        loaded = false;
+      } catch (e) {
+        console.warn("category sound save:", e);
+      }
+
+      const f = $("adminCatSound");
+      if (f) f.value = "";
+      return out;
+    };
+  }
+
+  const origEdit = window.editCategory;
+  if (typeof origEdit === "function") {
+    window.editCategory = function (id) {
+      const r = origEdit.apply(this, arguments);
+      ensureSoundField();
+      const f = $("adminCatSound");
+      if (f) f.value = "";
+      getDoc(doc(db, "categories", id))
+        .then((snap) => { if (f && snap.exists()) f.value = snap.data().soundUrl || ""; })
+        .catch(() => {});
+      return r;
+    };
+  }
+
+  const origReset = window.resetCategoryForm;
+  if (typeof origReset === "function") {
+    window.resetCategoryForm = function () {
+      const r = origReset.apply(this, arguments);
+      const f = $("adminCatSound");
+      if (f) f.value = "";
+      return r;
+    };
+  }
+})();
 
 function updateMuteBtn() {
   const b = $("wlMute");
