@@ -455,22 +455,25 @@ function unlockWin(src) {
   try {
     const full = new URL(src || DEFAULT_SOUND, document.baseURI).href;
     if (winSnd.src !== full) winSnd.src = full;
-    winSnd.loop = true;
-    winSnd.muted = true;
-    winSnd.currentTime = 0;
+  } catch (e) {}
+  try { winSnd.loop = true; winSnd.muted = true; } catch (e) {}
+  // Safari throws if you seek before the new file has loaded, so only seek
+  // when it is safe. Each step has its own try, so play() always runs.
+  try { if (winSnd.readyState > 0) winSnd.currentTime = 0; } catch (e) {}
+  try {
     const p = winSnd.play();
     if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
 function playWin() {
+  try { winSnd.loop = false; } catch (e) {}
+  try { winSnd.currentTime = 0; } catch (e) {}
+  if (muted) {
+    try { winSnd.pause(); } catch (e) {}
+    return;
+  }
   try {
-    winSnd.loop = false;
-    winSnd.currentTime = 0;
-    if (muted) {
-      winSnd.pause();
-      return;
-    }
     winSnd.muted = false;
     const p = winSnd.play();
     if (p && p.catch) p.catch(() => {});
@@ -613,7 +616,7 @@ function ensureSoundField() {
   ensureSoundField();
 
   const origSave = window.saveCategoryToFirebase;
- if (false) {
+  if (false) {
     window.saveCategoryToFirebase = async function () {
       ensureSoundField();
       const sound = (($("adminCatSound") || {}).value || "").trim();
