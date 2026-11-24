@@ -438,12 +438,11 @@ function tick() {
    iPhone lets it play at the end of the spin without any other tap.
    If the category's own file can't be read, the default win.mp3 plays. */
 
-const DEFAULT_SOUND = "chicken.mp3";
+const DEFAULT_SOUND = ""; /* no default: a category without a sound stays silent */
 const bufCache = {};
 let curBufP = null;
 let winNode = null;
 let winToken = 0;
-let fallbackEl = null;
 
 /* Debug line: open the site with ?wldebug=1 to see what the sound is doing. */
 let DEBUG = false;
@@ -467,15 +466,14 @@ function dbg(msg) {
 }
 
 function soundFor(item) {
-  return DEFAULT_SOUND; /* one shared sound for every category */
   const s = String((item && item.sound) || "").trim();
-  if (!s) return DEFAULT_SOUND;
-  if (/^https?:\/\//i.test(s)) return s;
+  if (!s) return "";
+  if (/^(https?:\/\/|data:)/i.test(s)) return s;
   return s.replace(/^\/+/, "");
 }
 
 function fullUrl(src) {
-  try { return new URL(src || DEFAULT_SOUND, document.baseURI).href; } catch (e) { return DEFAULT_SOUND; }
+  try { return new URL(src, document.baseURI).href; } catch (e) { return src; }
 }
 
 function loadBuf(src) {
@@ -483,19 +481,27 @@ function loadBuf(src) {
   if (!bufCache[url]) {
     bufCache[url] = (async () => {
       try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("http " + r.status);
-        const ab = await r.arrayBuffer();
+        let ab;
+        if (/^data:/i.test(url)) {
+          const bin = atob(url.slice(url.indexOf(",") + 1));
+          const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          ab = u8.buffer;
+        } else {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error("http " + r.status);
+          ab = await r.arrayBuffer();
+        }
         const a = audio();
         if (!a) throw new Error("no audio");
         const buf = await new Promise((res, rej) => {
           const p = a.decodeAudioData(ab, res, rej);
           if (p && p.catch) p.catch(rej);
         });
-        dbg("loaded " + (url === fullUrl(DEFAULT_SOUND) ? "default" : "custom") + " " + buf.duration.toFixed(1) + "s");
+        dbg("loaded " + "sound " + buf.duration.toFixed(1) + "s");
         return buf;
       } catch (e) {
-        dbg("load FAIL " + (url === fullUrl(DEFAULT_SOUND) ? "default" : "custom") + " " + (e && e.message));
+        dbg("load FAIL " + (e && e.message));
         delete bufCache[url];
         return null;
       }
@@ -505,6 +511,7 @@ function loadBuf(src) {
 }
 
 function unlockWin(src) {
+  if (DEBUG) { try { dbg("bucket " + getApp().options.storageBucket); dbg("sound " + String(src).slice(0, 60)); } catch (e) {} }
   try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
   const a = audio();
   if (a) {
@@ -515,13 +522,11 @@ function unlockWin(src) {
       s.start(0);
     } catch (e) {}
   }
-  curBufP = loadBuf(src);
-  loadBuf(DEFAULT_SOUND);
+  curBufP = src ? loadBuf(src) : null;
 }
 
 function stopNode() {
   if (winNode) { try { winNode.stop(); } catch (e) {} winNode = null; }
-  if (fallbackEl) { try { fallbackEl.pause(); } catch (e) {} }
 }
 
 async function playWin() {
@@ -529,7 +534,7 @@ async function playWin() {
   const token = ++winToken;
   let buf = null;
   try { buf = curBufP ? await curBufP : null; } catch (e) {}
-  if (!buf) buf = await loadBuf(DEFAULT_SOUND);
+  if (!buf) { dbg(curBufP ? "sound could not be played" : "no sound set for this category"); return; }
   if (token !== winToken || muted) return;
 
   const a = audio();
@@ -545,14 +550,6 @@ async function playWin() {
       return;
     } catch (e) { dbg("play FAIL " + (e && e.name)); }
   }
-  /* last resort: normal audio element */
-  try {
-    if (!fallbackEl) fallbackEl = new Audio(fullUrl(DEFAULT_SOUND));
-    fallbackEl.currentTime = 0;
-    const p = fallbackEl.play();
-    if (p && p.catch) p.catch(() => {});
-    dbg("fallback element");
-  } catch (e) {}
 }
 
 function stopWin() {
@@ -683,6 +680,41 @@ function ensureSoundField() {
     '<div class="upload-help-text">اكتب اسم ملف الصوت اللي رفعته على GitHub. إذا تركته فاضي بيشتغل الصوت العادي.</div>';
   grp.after(box);
 }
+
+document.addEventListener("change", (e) => {
+  const inp = e.target;
+  if (!inp || inp.id !== "adminCatSoundFile") return;
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  const MAX = 250 * 1024;
+  if (!/\.mp3$/i.test(f.name) && f.type !== "audio/mpeg") {
+    toast("الملف لازم يكون mp3", "error"); inp.value = ""; return;
+  }
+  if (f.size > MAX) {
+    toast("حجم الصوت كبير (" + Math.round(f.size / 1024) + "KB). الحد الأقصى 250KB. قصّ الأغنية أو صغّر حجمها.", "error");
+    inp.value = ""; return;
+  }
+  const rd = new FileReader();
+  rd.onload = () => {
+    ensureSoundField();
+    const field = $("adminCatSound");
+    if (!field) return;
+    field.removeAttribute("maxlength");
+    field.value = String(rd.result).replace(/^data:[^;,]*/, "data:audio/mpeg");
+    inp.value = ""; /* so the old Storage upload is skipped */
+    let note = $("adminCatSoundNote");
+    if (!note) {
+      note = document.createElement("div");
+      note.id = "adminCatSoundNote";
+      note.style.cssText = "margin-top:6px;font-size:12px;color:#6fd08c";
+      field.parentNode.appendChild(note);
+    }
+    note.textContent = "✔ الصوت جاهز (" + Math.round(f.size / 1024) + "KB). اضغط حفظ القسم.";
+    toast("تم تجهيز الصوت، اضغط حفظ", "success");
+  };
+  rd.onerror = () => toast("تعذّرت قراءة الملف", "error");
+  rd.readAsDataURL(f);
+}, true);
 
 (function hookAdmin() {
   ensureSoundField();
