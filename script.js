@@ -2660,8 +2660,7 @@ function startCategoryMoment(cat, title, photo, sourceEl) {
 
   const id =
     (cat && (cat.id || cat.nameAr || cat.nameEn)) || title || photo || "moment";
-  const full = !readSeenMoments().has(id);
-  rememberMoment(id);
+  const full = true;
 
   const art = document.getElementById("momentArt");
   const img = document.getElementById("momentImg");
