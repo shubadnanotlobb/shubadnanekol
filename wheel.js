@@ -431,7 +431,7 @@ function tick() {
   o.stop(t + 0.08);
 }
 
-const winSnd = new Audio("spin.mp3");
+const winSnd = new Audio("spin.mp3.mpeg");
 winSnd.preload = "auto";
 
 function unlockWin() {
