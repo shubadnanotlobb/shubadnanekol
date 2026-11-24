@@ -735,9 +735,15 @@ function loadPageFromHash() {
   if (unEl) unEl.value = "";
   if (pwEl) pwEl.value = "";
 
-  const hash = window.location.hash.replace("#", "");
-  const savedPage = localStorage.getItem("lastActivePage");
-  
+ // أول فتح بجلسة جديدة (بعد ما سكّر الموقع كلياً) = الصفحة الرئيسية
+  let isNewSession = true;
+  try {
+    isNewSession = sessionStorage.getItem("shu_session_started") !== "1";
+    sessionStorage.setItem("shu_session_started", "1");
+  } catch (e) {}
+
+  const hash = isNewSession ? "" : window.location.hash.replace("#", "");
+  const savedPage = isNewSession ? "" : localStorage.getItem("lastActivePage");
   const pageToLoad = (hash && document.getElementById(hash)) ? hash : (savedPage && document.getElementById(savedPage) ? savedPage : "pageHome");
 
   // تفعيل الصفحة بدون إضافة سجل مضاعف
