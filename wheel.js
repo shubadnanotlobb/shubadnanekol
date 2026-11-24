@@ -430,8 +430,14 @@ function tick() {
   o.start(t);
   o.stop(t + 0.08);
 }
+function bell(freq, start) {
+  tone(freq, start, 0.9, "sine", 0.16);
+  tone(freq * 2, start, 0.6, "sine", 0.05);
+  tone(freq * 3, start, 0.35, "sine", 0.025);
+}
+
 function winSound() {
-  [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, "triangle", 0.18));
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(f, i * 0.12));
 }
 
 function updateMuteBtn() {
