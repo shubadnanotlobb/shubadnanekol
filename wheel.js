@@ -84,6 +84,7 @@ function mountModal() {
   m.innerHTML =
     '<div class="wl-card" role="dialog" aria-label="دولاب الحظ">' +
       '<button type="button" class="wl-close" data-wl="close" aria-label="إغلاق">×</button>' +
+    '<button type="button" class="wl-mute" id="wlMute" data-wl="mute" aria-label="الصوت">🔊</button>' +
       '<h2 class="wl-title">دولاب الحظ</h2>' +
       '<p class="wl-sub" id="wlSub">لف الدولاب وشوف شو رح تاكل اليوم</p>' +
       '<div class="wl-stage">' +
@@ -111,6 +112,11 @@ function mountModal() {
     if (act === "close") closeWheel();
     else if (act === "spin" || act === "again") spin();
     else if (act === "go") go();
+    else if (act === "mute") {
+      muted = !muted;
+      try { localStorage.setItem("wl_muted", muted ? "1" : "0"); } catch (e) {}
+      updateMuteBtn();
+    }
   });
 
   document.addEventListener("keydown", (e) => {
@@ -280,6 +286,7 @@ async function openWheel() {
   const m = $("wlModal");
   m.hidden = false;
   document.body.style.overflow = "hidden";
+  updateMuteBtn();
   $("wlResult").hidden = true;
   picked = null;
 
@@ -309,6 +316,7 @@ function closeWheel() {
 function spin() {
   if (spinning || !items.length) return;
   spinning = true;
+  audio();
   $("wlResult").hidden = true;
   $("wlSpin").disabled = true;
 
@@ -322,11 +330,16 @@ function spin() {
   const start = rot;
   const dur = 5000;
   const t0 = performance.now();
+  let lastSeg = -1;
+  let lastTick = 0;
 
   function frame(now) {
     const p = Math.min(1, (now - t0) / dur);
     rot = start + delta * (1 - Math.pow(1 - p, 4));
     blink = Math.floor((now - t0) / 140) % 2;
+    const cur = Math.floor(((((-Math.PI / 2 - rot) % TAU) + TAU) % TAU) / seg);
+    if (cur !== lastSeg && now - lastTick > 35) { tick(); lastTick = now; }
+    lastSeg = cur;
     draw();
     if (p < 1) requestAnimationFrame(frame);
     else finish(idx);
@@ -355,6 +368,8 @@ function finish(idx) {
   }
 
   $("wlResult").hidden = false;
+  winSound();
+  winSound();
   try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
 }
 
@@ -366,5 +381,48 @@ function go() {
     window.openRestaurantsByCategory(p.id, p.name, p.img || "", null);
   }
 }
+
+/* ---------------- sound ---------------- */
+
+let actx = null;
+let muted = false;
+try { muted = localStorage.getItem("wl_muted") === "1"; } catch (e) {}
+
+function audio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+function tone(freq, start, dur, type, vol) {
+  const a = audio();
+  if (!a || muted) return;
+  const o = a.createOscillator();
+  const g = a.createGain();
+  const t = a.currentTime + start;
+  o.type = type || "sine";
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  g.connect(a.destination);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+function tick() { tone(900, 0, 0.05, "square", 0.06); }
+
+function winSound() {
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, "triangle", 0.18));
+}
+
+function updateMuteBtn() {
+  const b = $("wlMute");
+  if (b) b.textContent = muted ? "🔇" : "🔊";
+}
+
 
 mountEntry();
