@@ -317,6 +317,7 @@ function spin() {
   if (spinning || !items.length) return;
   spinning = true;
   audio();
+  unlockWin();
   $("wlResult").hidden = true;
   $("wlSpin").disabled = true;
 
@@ -440,6 +441,21 @@ function winSound() {
   [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => bell(f, i * 0.12));
 }
 
+const spinSnd = new Audio("spin.mp3");
+spinSnd.preload = "auto";
+
+function playSpin() {
+  if (muted) return;
+  try {
+    spinSnd.currentTime = 0;
+    const p = spinSnd.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+}
+
+function stopSpin() {
+  try { spinSnd.pause(); } catch (e) {}
+}
 function updateMuteBtn() {
   const b = $("wlMute");
   if (b) b.textContent = muted ? "🔇" : "🔊";
