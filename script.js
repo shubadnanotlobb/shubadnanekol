@@ -2070,59 +2070,27 @@ onAuthStateChanged(auth, (user) => {
 // ============================================================
 
 function filterCategories() {
-const grid =
-    document.getElementById(
-      "categoriesGridContainer"
-    );
-  if (!grid)
-    return;
 
-
-  grid.innerHTML = "";
-  
   const queryStr =
-    document.getElementById(
-      "categoriesSearchInput"
-   )?.value
+    document.getElementById("categoriesSearchInput")?.value
       .toLowerCase()
       .trim() || "";
 
-  const grid =
-    document.getElementById(
-      "categoriesGridContainer"
-    );
+  const grid = document.getElementById("categoriesGridContainer");
 
+  if (!grid) return;
 
-  if (!grid)
-    return;
-
-
- grid.innerHTML = "";
+  grid.innerHTML = "";
 
   renderRestaurantMatches(queryStr);
 
+  const restBox = document.getElementById("categoriesRestaurantResults");
+  const hasRestaurantMatches = !!(restBox && !restBox.hidden);
 
-  const filtered =
-    allCategories.filter(c =>
-
-      (
-        c.nameAr &&
-        c.nameAr
-          .toLowerCase()
-          .includes(queryStr)
-      )
-
-      ||
-
-      (
-        c.nameEn &&
-        c.nameEn
-          .toLowerCase()
-          .includes(queryStr)
-      )
-
-    );
-
+  const filtered = allCategories.filter(c =>
+    (c.nameAr && c.nameAr.toLowerCase().includes(queryStr)) ||
+    (c.nameEn && c.nameEn.toLowerCase().includes(queryStr))
+  );
 
   if (filtered.length === 0) {
 
@@ -2136,6 +2104,9 @@ const grid =
       return;
     }
 
+    // في مطاعم مطابقة: بنعرضها بس، بدون رسالة "لا توجد نتائج"
+    if (hasRestaurantMatches) return;
+
     grid.innerHTML = queryStr
       ? emptyStateHtml(
           "لا توجد نتائج",
@@ -2148,18 +2119,12 @@ const grid =
         );
 
     return;
-
   }
-
 
   filtered.forEach((data, index) => {
 
-    const card =
-      document.createElement("div");
-
-
-    card.className =
-      "category-card";
+    const card = document.createElement("div");
+    card.className = "category-card";
 
     if (!queryStr && index < 6) {
       card.classList.add("stagger-in");
@@ -2171,8 +2136,7 @@ const grid =
     card.onclick = (event) =>
       openRestaurantsByCategory(
         data.id,
-        data.nameAr ||
-          data.nameEn,
+        data.nameAr || data.nameEn,
         data.imgUrl,
         event
       );
@@ -2189,7 +2153,6 @@ const grid =
       : "";
 
     card.innerHTML = `
-
       <div class="cat-media">
         ${catImg}
       </div>
@@ -2199,27 +2162,17 @@ const grid =
         <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </div>
 
-      ${
-        pair[1]
-          ? `<div class="cat-en">${escapeHtml(pair[1])}</div>`
-          : ""
-      }
-
+      ${pair[1] ? `<div class="cat-en">${escapeHtml(pair[1])}</div>` : ""}
     `;
 
-
     grid.appendChild(card);
-
   });
 
   sweepImages(grid);
 
   renderHomeCategories();
   fixRegionImage();
-
 }
-
-
 // ============================================================
 // FILTER RESTAURANTS
 // ============================================================
