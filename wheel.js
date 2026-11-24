@@ -442,6 +442,27 @@ const DEFAULT_SOUND = "win.mp3";
 const sndPool = {};
 let curSnd = null;
 
+/* Debug line: open the site with ?wldebug=1 to see what the sound is doing. */
+let DEBUG = false;
+try { DEBUG = /[?&]wldebug/.test(location.search); } catch (e) {}
+let dbgLines = [];
+
+function dbg(msg) {
+  if (!DEBUG) return;
+  dbgLines.push(msg);
+  if (dbgLines.length > 14) dbgLines.shift();
+  let box = $("wlDbg");
+  if (!box) {
+    const card = document.querySelector("#wlModal .wl-card");
+    if (!card) return;
+    box = document.createElement("pre");
+    box.id = "wlDbg";
+    box.style.cssText = "margin:10px 0 0;padding:8px;background:#000;color:#9f9;font:11px/1.4 monospace;text-align:left;direction:ltr;white-space:pre-wrap;border-radius:8px";
+    card.appendChild(box);
+  }
+  box.textContent = dbgLines.join("\n");
+}
+
 function soundFor(item) {
   const s = String((item && item.sound) || "").trim();
   if (!s) return DEFAULT_SOUND;
@@ -459,7 +480,9 @@ function getSnd(src) {
   if (!el) {
     el = new Audio();
     el.preload = "auto";
-    el.addEventListener("error", () => { el._bad = true; });
+    el.addEventListener("error", () => { el._bad = true; dbg("ERR " + url.split("/").pop().slice(0, 18)); });
+    el.addEventListener("pause", () => dbg("pause-event " + url.split("/").pop().slice(0, 12)));
+    el.addEventListener("ended", () => dbg("ended " + url.split("/").pop().slice(0, 12)));
     el.src = url;
     sndPool[url] = el;
   }
@@ -471,7 +494,10 @@ function startSilent(el) {
   try { if (el.readyState > 0) el.currentTime = 0; } catch (e) {}
   try {
     const p = el.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p && p.then) {
+      p.then(() => dbg("silent-start ok"))
+       .catch((e) => dbg("silent-start FAIL " + (e && e.name)));
+    }
   } catch (e) {}
 }
 
@@ -493,6 +519,7 @@ function playWin() {
     }
   });
 
+  dbg("pick=" + (el === def ? "default" : "custom") + " rs=" + el.readyState + " paused=" + el.paused);
   try { el.loop = false; } catch (e) {}
   try { el.currentTime = 0; } catch (e) {}
   if (muted) {
@@ -502,7 +529,10 @@ function playWin() {
   try {
     el.muted = false;
     const p = el.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p && p.then) {
+      p.then(() => dbg("play ok"))
+       .catch((e) => dbg("play FAIL " + (e && e.name)));
+    }
   } catch (e) {}
 }
 
