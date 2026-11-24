@@ -3708,3 +3708,4 @@ body.is-home .appbar-menu{display:flex}
 .drawer-item:active{background:var(--surface-2)}
 .drawer-item svg{width:20px;height:20px;color:#ff6b81;flex:0 0 auto}
 .drawer-item span{flex:1}
+.appbar-menu{left:auto!important;inset-inline-start:auto!important;right:calc(var(--pad) - 8px)!important}
