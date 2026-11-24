@@ -438,7 +438,7 @@ function tick() {
    iPhone lets it play at the end of the spin without any other tap.
    If the category's own file can't be read, the default win.mp3 plays. */
 
-const DEFAULT_SOUND = "win.mp3";
+const DEFAULT_SOUND = "chicken.mp3";
 const bufCache = {};
 let curBufP = null;
 let winNode = null;
