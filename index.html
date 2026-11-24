@@ -133,6 +133,9 @@
 <!-- ============================ APP BAR ============================ -->
 <header class="appbar">
     <div class="appbar-inner shell">
+        <button class="appbar-menu" id="menuBtn" type="button" onclick="window.openSideMenu()" aria-label="القائمة">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
         <button class="appbar-back" id="backBtn" onclick="window.goBack()" aria-label="رجوع">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -540,6 +543,14 @@
 
         <button class="btn btn-danger btn-block" type="button" onclick="window.resetRestaurantStats()">تصفير إحصائيات هالمطعم</button>
     </div>
+    <!-- ---------------- PAGE 9: SAVED ---------------- -->
+    <div class="view-page" id="pageSaved">
+        <div class="section-head">
+            <h1 class="section-title">المحفوظات</h1>
+            <span class="section-sub">المطاعم اللي حفظتها</span>
+        </div>
+        <div class="home-search-results" id="savedListContainer"></div>
+    </div>
 </main>
 
 <!-- ============================ FOOTER ============================ -->
@@ -606,7 +617,17 @@
         <button class="ios-done-btn" onclick="closeIosGuide()" type="button">إغلاق</button>
     </div>
 </div>
-
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="sideDrawer" aria-hidden="true">
+    <div class="drawer-head">
+        <span class="drawer-title">القائمة</span>
+        <button class="drawer-close" type="button" onclick="window.closeSideMenu()" aria-label="إغلاق">&times;</button>
+    </div>
+    <button class="drawer-item" type="button" onclick="window.openSavedPage()">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.7 10.6 19.4C5.4 14.7 2 11.6 2 7.9 2 5.1 4.2 3 7 3c1.6 0 3.1.7 4.1 1.9L12 5.4l.9-.5C13.9 3.7 15.4 3 17 3c2.8 0 5 2.1 5 4.9 0 3.7-3.4 6.8-8.6 11.5L12 20.7Z"/></svg>
+        <span>المحفوظات</span>
+    </button>
+</aside>
 <!-- ============================ TOASTS ============================ -->
 <div class="toast-stack" id="toastStack" role="status" aria-live="polite"></div>
 
