@@ -824,6 +824,8 @@ function resetCategoryForm() {
 
   if (adminCatImg)
     adminCatImg.value = "";
+  const adminCatSound = document.getElementById("adminCatSound");
+  if (adminCatSound) adminCatSound.value = "";
 
   if (adminCatFile)
     adminCatFile.value = "";
@@ -858,6 +860,8 @@ async function saveCategoryToFirebase() {
 
   const catFile =
     document.getElementById("adminCatFile")?.files?.[0];
+  const soundUrl =
+    document.getElementById("adminCatSound")?.value.trim() || "";
 
 
   if (!nameAr || !nameEn) {
@@ -891,7 +895,8 @@ async function saveCategoryToFirebase() {
           nameAr,
           nameEn,
           order: categoryOrder,
-          imgUrl: finalImg
+          imgUrl: finalImg,
+          soundUrl
         }
       );
 
@@ -907,6 +912,7 @@ async function saveCategoryToFirebase() {
           nameEn,
           order: categoryOrder,
           imgUrl: finalImg,
+          soundUrl,
           createdAt: new Date()
         }
       );
@@ -980,6 +986,8 @@ function editCategory(
 
   if (adminCatImg)
     adminCatImg.value = imgUrl || "";
+  const adminCatSound = document.getElementById("adminCatSound");
+  if (adminCatSound) adminCatSound.value = arguments[5] || "";
 
   if (catPreview) {
     catPreview.src = imgUrl || "";
@@ -3829,8 +3837,7 @@ function listenToCategories() {
                 <button
                   class="btn btn-sm btn-ghost"
                   type="button"
-                  onclick="window.editCategory('${id}', '${String(data.nameAr || "").replace(/'/g, "\\'")}', '${String(data.nameEn || "").replace(/'/g, "\\'")}', ${data.order !== undefined && data.order !== null ? data.order : 'null'}, '${String(data.imgUrl || "").replace(/'/g, "\\'")}')"
-                >
+onclick="window.editCategory('${id}', '${String(data.nameAr || "").replace(/'/g, "\\'")}', '${String(data.nameEn || "").replace(/'/g, "\\'")}', ${data.order !== undefined && data.order !== null ? data.order : 'null'}, '${String(data.imgUrl || "").replace(/'/g, "\\'")}', '${String(data.soundUrl || "").replace(/'/g, "\\'")}')"                >
                   تعديل
                 </button>
 
