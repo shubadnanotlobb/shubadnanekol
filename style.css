@@ -3725,3 +3725,7 @@ body.has-menu:not(.is-home) header.appbar .appbar-back{position:absolute!importa
 .drawer.is-open{transform:none!important}
 body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
 body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:auto!important;right:auto!important;margin-inline-start:-8px!important}
+
+header.appbar .appbar-menu{right:12px!important;left:auto!important}
+body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
+body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:auto!important;right:auto!important;margin-inline-start:-8px!important}
