@@ -5345,3 +5345,94 @@ function normSearch(s) {
     .replace(/ة/g, "ه")
     .trim();
 }
+// ============================================================
+// SIDE MENU + SAVED PAGE
+// ============================================================
+
+PAGE_TITLES.pageSaved = "المحفوظات";
+
+function openSideMenu() {
+  const drawer = document.getElementById("sideDrawer");
+  const backdrop = document.getElementById("drawerBackdrop");
+  if (!drawer || !backdrop) return;
+  backdrop.hidden = false;
+  drawer.classList.add("is-open");
+  drawer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("no-scroll");
+}
+
+function closeSideMenu() {
+  const drawer = document.getElementById("sideDrawer");
+  const backdrop = document.getElementById("drawerBackdrop");
+  if (!drawer || !backdrop) return;
+  drawer.classList.remove("is-open");
+  drawer.setAttribute("aria-hidden", "true");
+  backdrop.hidden = true;
+  document.body.classList.remove("no-scroll");
+}
+
+function openSavedPage() {
+  closeSideMenu();
+  localStorage.setItem("parentPage", "pageHome");
+  renderSavedPage();
+  showPage("pageSaved");
+}
+
+function renderSavedPage() {
+  const box = document.getElementById("savedListContainer");
+  if (!box) return;
+
+  if (!restaurantsLoaded) {
+    box.innerHTML = '<div class="admin-list-note">جاري التحميل...</div>';
+    return;
+  }
+
+  const items = readFavorites()
+    .slice()
+    .reverse()
+    .map((id) => allRestaurants.find((r) => r && r.id === id))
+    .filter(Boolean);
+
+  if (!items.length) {
+    box.innerHTML = emptyStateHtml(
+      "ما حفظت أي مطعم بعد",
+      "اضغط القلب بأي مطعم وبتلاقيه هون.",
+      ["browse"]
+    );
+    return;
+  }
+
+  box.innerHTML = items.map((r) => {
+    const closed = isRestaurantClosed(r.openTime, r.closeTime);
+    const pic = r.logo || r.cover || "";
+    return (
+      '<button type="button" class="search-result" data-rest="' + escapeHtml(r.id) + '">' +
+        '<span class="search-result-img">' +
+          (pic ? '<img src="' + escapeHtml(pic) + '" alt="" loading="lazy">' : "") +
+        "</span>" +
+        '<span class="search-result-name">' + escapeHtml(r.name || "") + "</span>" +
+        '<span class="status ' + (closed ? "is-closed" : "is-open") + '"><i></i>' +
+          (closed ? "مغلق" : "مفتوح") + "</span>" +
+      "</button>"
+    );
+  }).join("");
+
+  box.onclick = (e) => {
+    const btn = e.target.closest(".search-result");
+    if (!btn) return;
+    const r = allRestaurants.find((x) => x.id === btn.dataset.rest);
+    if (r) openRestaurantProfile(r, e);
+  };
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  const backdrop = document.getElementById("drawerBackdrop");
+  if (backdrop) backdrop.addEventListener("click", closeSideMenu);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSideMenu();
+  });
+});
+
+window.openSideMenu = openSideMenu;
+window.closeSideMenu = closeSideMenu;
+window.openSavedPage = openSavedPage;
