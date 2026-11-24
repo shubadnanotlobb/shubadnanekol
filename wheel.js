@@ -432,15 +432,18 @@ function tick() {
   o.stop(t + 0.08);
 }
 
-/* ---------------- win sound (iPhone-safe) ----------------
-   iPhone only lets a sound start from a tap. So on every SPIN tap we start
-   the winner's sound (and the default one as a backup) silently on loop.
-   When the wheel stops we un-mute the right one and play it from the start.
-   Each sound has its own player, so we never swap files mid-way. */
+/* ---------------- win sound (WebAudio, iPhone-safe) ----------------
+   The sound is decoded into memory and played through the same audio engine
+   that already makes the tick sounds. Once the SPIN tap has woken it up,
+   iPhone lets it play at the end of the spin without any other tap.
+   If the category's own file can't be read, the default win.mp3 plays. */
 
 const DEFAULT_SOUND = "win.mp3";
-const sndPool = {};
-let curSnd = null;
+const bufCache = {};
+let curBufP = null;
+let winNode = null;
+let winToken = 0;
+let fallbackEl = null;
 
 /* Debug line: open the site with ?wldebug=1 to see what the sound is doing. */
 let DEBUG = false;
@@ -474,73 +477,86 @@ function fullUrl(src) {
   try { return new URL(src || DEFAULT_SOUND, document.baseURI).href; } catch (e) { return DEFAULT_SOUND; }
 }
 
-function getSnd(src) {
+function loadBuf(src) {
   const url = fullUrl(src);
-  let el = sndPool[url];
-  if (!el) {
-    el = new Audio();
-    el.preload = "auto";
-    el.addEventListener("error", () => { el._bad = true; dbg("ERR " + url.split("/").pop().slice(0, 18)); });
-    el.addEventListener("pause", () => dbg("pause-event " + url.split("/").pop().slice(0, 12)));
-    el.addEventListener("ended", () => dbg("ended " + url.split("/").pop().slice(0, 12)));
-    el.src = url;
-    sndPool[url] = el;
+  if (!bufCache[url]) {
+    bufCache[url] = (async () => {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error("http " + r.status);
+        const ab = await r.arrayBuffer();
+        const a = audio();
+        if (!a) throw new Error("no audio");
+        const buf = await new Promise((res, rej) => {
+          const p = a.decodeAudioData(ab, res, rej);
+          if (p && p.catch) p.catch(rej);
+        });
+        dbg("loaded " + (url === fullUrl(DEFAULT_SOUND) ? "default" : "custom") + " " + buf.duration.toFixed(1) + "s");
+        return buf;
+      } catch (e) {
+        dbg("load FAIL " + (url === fullUrl(DEFAULT_SOUND) ? "default" : "custom") + " " + (e && e.message));
+        delete bufCache[url];
+        return null;
+      }
+    })();
   }
-  return el;
-}
-
-function startSilent(el) {
-  try { el.loop = true; el.muted = true; } catch (e) {}
-  try { if (el.readyState > 0) el.currentTime = 0; } catch (e) {}
-  try {
-    const p = el.play();
-    if (p && p.then) {
-      p.then(() => dbg("silent-start ok"))
-       .catch((e) => dbg("silent-start FAIL " + (e && e.name)));
-    }
-  } catch (e) {}
+  return bufCache[url];
 }
 
 function unlockWin(src) {
-  const def = getSnd(DEFAULT_SOUND);
-  curSnd = getSnd(src);
-  startSilent(def);
-  if (curSnd !== def) startSilent(curSnd);
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+  const a = audio();
+  if (a) {
+    try {
+      const s = a.createBufferSource();
+      s.buffer = a.createBuffer(1, 1, 22050);
+      s.connect(a.destination);
+      s.start(0);
+    } catch (e) {}
+  }
+  curBufP = loadBuf(src);
+  loadBuf(DEFAULT_SOUND);
 }
 
-function playWin() {
-  const def = getSnd(DEFAULT_SOUND);
-  const el = curSnd && !curSnd._bad && curSnd.readyState >= 2 ? curSnd : def;
+function stopNode() {
+  if (winNode) { try { winNode.stop(); } catch (e) {} winNode = null; }
+  if (fallbackEl) { try { fallbackEl.pause(); } catch (e) {} }
+}
 
-  Object.keys(sndPool).forEach((k) => {
-    const o = sndPool[k];
-    if (o !== el) {
-      try { o.pause(); o.loop = false; o.muted = false; } catch (e) {}
-    }
-  });
+async function playWin() {
+  if (muted) return;
+  const token = ++winToken;
+  let buf = null;
+  try { buf = curBufP ? await curBufP : null; } catch (e) {}
+  if (!buf) buf = await loadBuf(DEFAULT_SOUND);
+  if (token !== winToken || muted) return;
 
-  dbg("pick=" + (el === def ? "default" : "custom") + " rs=" + el.readyState + " paused=" + el.paused);
-  try { el.loop = false; } catch (e) {}
-  try { el.currentTime = 0; } catch (e) {}
-  if (muted) {
-    try { el.pause(); } catch (e) {}
-    return;
+  const a = audio();
+  if (buf && a) {
+    stopNode();
+    try {
+      const s = a.createBufferSource();
+      s.buffer = buf;
+      s.connect(a.destination);
+      s.start(0);
+      winNode = s;
+      dbg("play ok state=" + a.state);
+      return;
+    } catch (e) { dbg("play FAIL " + (e && e.name)); }
   }
+  /* last resort: normal audio element */
   try {
-    el.muted = false;
-    const p = el.play();
-    if (p && p.then) {
-      p.then(() => dbg("play ok"))
-       .catch((e) => dbg("play FAIL " + (e && e.name)));
-    }
+    if (!fallbackEl) fallbackEl = new Audio(fullUrl(DEFAULT_SOUND));
+    fallbackEl.currentTime = 0;
+    const p = fallbackEl.play();
+    if (p && p.catch) p.catch(() => {});
+    dbg("fallback element");
   } catch (e) {}
 }
 
 function stopWin() {
-  Object.keys(sndPool).forEach((k) => {
-    const o = sndPool[k];
-    try { o.pause(); o.loop = false; o.muted = false; } catch (e) {}
-  });
+  winToken++;
+  stopNode();
 }
 
 /* ---------------- confetti / fireworks ---------------- */
