@@ -826,6 +826,8 @@ function resetCategoryForm() {
     adminCatImg.value = "";
   const adminCatSound = document.getElementById("adminCatSound");
   if (adminCatSound) adminCatSound.value = "";
+  const adminCatSoundFile = document.getElementById("adminCatSoundFile");
+  if (adminCatSoundFile) adminCatSoundFile.value = "";
 
   if (adminCatFile)
     adminCatFile.value = "";
@@ -841,6 +843,19 @@ function resetCategoryForm() {
 }
 
 
+async function uploadCategorySound(file) {
+  if (!file) return "";
+
+  const isMp3 = file.type === "audio/mpeg" || /\.mp3$/i.test(file.name);
+  if (!isMp3) throw new Error("ملف الصوت لازم يكون mp3 فقط.");
+  if (file.size > 2 * 1024 * 1024) throw new Error("ملف الصوت أكبر من 2 MB.");
+
+  const uniqueName = createUniqueFileName(createSafeFileName(file.name));
+  const storageRef = ref(storage, `category-sounds/${uniqueName}`);
+
+  await uploadBytes(storageRef, file, { contentType: "audio/mpeg" });
+  return await getDownloadURL(storageRef);
+}
 async function saveCategoryToFirebase() {
 
   const docId =
@@ -877,6 +892,9 @@ async function saveCategoryToFirebase() {
   try {
 
     let finalImg = manualImg || "";
+    const soundFile = document.getElementById("adminCatSoundFile")?.files?.[0];
+    let finalSound = soundUrl;
+    if (soundFile) finalSound = await uploadCategorySound(soundFile);
 
     if (catFile) {
       const uploadedCatImg = await uploadRestaurantImage(catFile, "category_imgs", "cat");
@@ -896,7 +914,7 @@ async function saveCategoryToFirebase() {
           nameEn,
           order: categoryOrder,
           imgUrl: finalImg,
-          soundUrl
+          soundUrl: finalSound
         }
       );
 
@@ -912,7 +930,7 @@ async function saveCategoryToFirebase() {
           nameEn,
           order: categoryOrder,
           imgUrl: finalImg,
-          soundUrl,
+          soundUrl: finalSound,
           createdAt: new Date()
         }
       );
