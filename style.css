@@ -3704,9 +3704,20 @@ body.is-entering #pageHome .install {
 .drawer-item:active{background:var(--surface-2)}
 .drawer-item svg{width:20px;height:20px;color:#ff6b81;flex:0 0 auto}
 .drawer-item span{flex:1}
-.appbar-inner{position:relative}
-.appbar-menu{display:none;position:absolute;top:50%;left:auto;right:calc(var(--pad) - 10px);inset-inline-start:auto;transform:translateY(-50%);width:48px;height:48px;align-items:center;justify-content:center;border-radius:var(--r-sm);color:var(--text)}
-.appbar-menu svg{width:30px;height:30px}
-.appbar-menu:active{background:var(--surface-2)}
-body.has-menu .appbar-menu{display:flex}
-body.has-menu:not(.is-home) .appbar-back{position:absolute;left:var(--pad);right:auto;margin:0}
+header.appbar .appbar-inner{position:relative!important}
+header.appbar .appbar-menu{
+  position:absolute!important;
+  top:50%!important;
+  right:12px!important;
+  left:auto!important;
+  inset-inline-start:auto!important;
+  inset-inline-end:12px!important;
+  transform:translateY(-50%)!important;
+  width:48px!important;height:48px!important;
+  display:none;
+  align-items:center;justify-content:center;
+  z-index:5;
+}
+header.appbar .appbar-menu svg{width:30px!important;height:30px!important}
+body.has-menu header.appbar .appbar-menu{display:flex!important}
+body.has-menu:not(.is-home) header.appbar .appbar-back{position:absolute!important;left:12px!important;right:auto!important;margin:0!important}
