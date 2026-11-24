@@ -5378,6 +5378,7 @@ function closeSideMenu() {
 function openSavedPage() {
   closeSideMenu();
   localStorage.setItem("parentPage", "pageHome");
+  pageHistory = [];
   renderSavedPage();
   showPage("pageSaved");
 }
