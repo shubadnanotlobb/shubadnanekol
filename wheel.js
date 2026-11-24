@@ -467,6 +467,7 @@ function dbg(msg) {
 }
 
 function soundFor(item) {
+  return DEFAULT_SOUND; /* one shared sound for every category */
   const s = String((item && item.sound) || "").trim();
   if (!s) return DEFAULT_SOUND;
   if (/^https?:\/\//i.test(s)) return s;
