@@ -3686,3 +3686,9 @@ body.is-entering #pageHome .install {
 .stats-row--btn{width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;cursor:pointer}
 .stats-row--btn:active{background:var(--surface-2)}
 .stats-head--3,.stats-row--3{grid-template-columns:minmax(0,1fr) 64px 64px}
+.home-search-results{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.search-result{display:flex;align-items:center;gap:var(--sp-3);width:100%;padding:var(--sp-3);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);text-align:start;color:inherit;font:inherit;cursor:pointer}
+.search-result:active{background:var(--surface-2)}
+.search-result-img{width:44px;height:44px;flex:0 0 auto;border-radius:50%;overflow:hidden;background:var(--surface-2)}
+.search-result-img img{width:100%;height:100%;object-fit:cover}
+.search-result-name{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
