@@ -613,7 +613,7 @@ function ensureSoundField() {
   ensureSoundField();
 
   const origSave = window.saveCategoryToFirebase;
-  if (typeof origSave === "function") {
+ if (false) {
     window.saveCategoryToFirebase = async function () {
       ensureSoundField();
       const sound = (($("adminCatSound") || {}).value || "").trim();
