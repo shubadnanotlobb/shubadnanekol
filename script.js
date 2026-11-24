@@ -663,7 +663,7 @@ function showPage(pageId, isBack = false) {
   document.body.classList.toggle("is-home", pageId === "pageHome");
   document.body.classList.toggle(
     "has-menu",
-    ["pageHome", "pageCategories", "pageRestaurants", "pageSaved"].indexOf(pageId) !== -1
+    ["pageHome", "pageCategories", "pageRestaurants", "pageRestaurants"].indexOf(pageId) !== -1
   );
 
   // Dynamic app-bar title — presentation only, with a short crossfade so the
