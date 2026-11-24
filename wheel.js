@@ -191,7 +191,7 @@ function draw() {
   ctx.fill();
 
   /* segments */
-  const badge = Math.max(24, Math.min(46, R * seg * 0.62));
+  const badge = Math.max(28, Math.min(66, R * seg * 0.8));
   const fontSize = Math.max(11, Math.min(15, badge * 0.4));
 
   for (let i = 0; i < n; i++) {
@@ -218,15 +218,7 @@ function draw() {
 
     const bx = R - 10 - badge / 2;
     drawBadge(ctx, bx, badge, items[i].img, pal[0]);
-
-    const tx = bx - badge / 2 - 8;
-    ctx.font = "700 " + fontSize + 'px "IBM Plex Sans Arabic", sans-serif';
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = "#fff";
-    ctx.shadowColor = "rgba(0,0,0,.55)";
-    ctx.shadowBlur = 4;
-    ctx.fillText(items[i].name, tx, 0, Math.max(30, tx - hub - 8));
+    
     ctx.restore();
   }
 
