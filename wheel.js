@@ -370,6 +370,7 @@ function finish(idx) {
 
   $("wlResult").hidden = false;
   playWin();
+  confetti();
   try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
 }
 
@@ -455,6 +456,113 @@ function playWin() {
 
 function stopWin() {
   try { winSnd.pause(); } catch (e) {}
+}
+
+/* ---------------- confetti / fireworks ---------------- */
+
+let confettiRun = 0;
+
+function confetti() {
+  const m = $("wlModal");
+  if (!m) return;
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  } catch (e) {}
+
+  const run = ++confettiRun;
+  let cv = $("wlConfetti");
+  if (!cv) {
+    cv = document.createElement("canvas");
+    cv.id = "wlConfetti";
+    cv.className = "wl-confetti";
+    m.appendChild(cv);
+  }
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = m.clientWidth;
+  const H = m.clientHeight;
+  cv.width = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  cv.style.width = W + "px";
+  cv.style.height = H + "px";
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const colors = ["#f6d68e", "#22c3b4", "#ee6f63", "#63a5f0", "#a082ea", "#5fcf88", "#fff6d6"];
+  const parts = [];
+  const t0 = performance.now();
+
+  function add(x, y, ang, spd, kind) {
+    const a = ang + (Math.random() - 0.5) * (kind === "spark" ? Math.PI * 2 : 0.9);
+    const v = spd * (0.45 + Math.random() * 0.75);
+    parts.push({
+      x: x, y: y,
+      vx: Math.cos(a) * v,
+      vy: Math.sin(a) * v,
+      w: 5 + Math.random() * 6,
+      h: 3 + Math.random() * 5,
+      rot: Math.random() * TAU,
+      vr: (Math.random() - 0.5) * 0.4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      kind: kind,
+      born: performance.now(),
+      life: kind === "spark" ? 1100 + Math.random() * 500 : 2400 + Math.random() * 900
+    });
+  }
+
+  function cannon(x, y, ang) {
+    for (let i = 0; i < 55; i++) add(x, y, ang, 15, "paper");
+  }
+
+  function firework(x, y) {
+    for (let i = 0; i < 46; i++) add(x, y, 0, 7, "spark");
+  }
+
+  cannon(W * 0.08, H * 0.9, -Math.PI * 0.36);
+  cannon(W * 0.92, H * 0.9, -Math.PI * 0.64);
+  firework(W * 0.5, H * 0.3);
+  setTimeout(() => { if (run === confettiRun) firework(W * (0.2 + Math.random() * 0.6), H * (0.2 + Math.random() * 0.2)); }, 380);
+  setTimeout(() => { if (run === confettiRun) firework(W * (0.2 + Math.random() * 0.6), H * (0.2 + Math.random() * 0.25)); }, 760);
+
+  let last = t0;
+  function frame(now) {
+    if (run !== confettiRun) return;
+    const dt = Math.min(2.5, (now - last) / 16.67);
+    last = now;
+    ctx.clearRect(0, 0, W, H);
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      const age = now - p.born;
+      if (age > p.life || p.y > H + 30) { parts.splice(i, 1); continue; }
+
+      p.vy += (p.kind === "spark" ? 0.12 : 0.28) * dt;
+      p.vx *= Math.pow(p.kind === "spark" ? 0.96 : 0.985, dt);
+      p.vy *= Math.pow(p.kind === "spark" ? 0.96 : 0.99, dt);
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+
+      ctx.globalAlpha = Math.max(0, Math.min(1, (p.life - age) / 500));
+      ctx.fillStyle = p.color;
+      if (p.kind === "spark") {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.4, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.rot * 2)) + 1);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    if (parts.length || now - t0 < 900) requestAnimationFrame(frame);
+    else cv.remove();
+  }
+  requestAnimationFrame(frame);
 }
 
 function updateMuteBtn() {
