@@ -3692,3 +3692,19 @@ body.is-entering #pageHome .install {
 .search-result-img{width:44px;height:44px;flex:0 0 auto;border-radius:50%;overflow:hidden;background:var(--surface-2)}
 .search-result-img img{width:100%;height:100%;object-fit:cover}
 .search-result-name{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appbar-inner{position:relative}
+.appbar-menu{display:none;position:absolute;top:50%;inset-inline-start:calc(var(--pad) - 8px);transform:translateY(-50%);width:40px;height:40px;align-items:center;justify-content:center;border-radius:var(--r-sm);color:var(--text)}
+.appbar-menu svg{width:24px;height:24px}
+.appbar-menu:active{background:var(--surface-2)}
+body.is-home .appbar-menu{display:flex}
+#homeCats{display:none!important}
+.drawer-backdrop{position:fixed;inset:0;z-index:98;background:rgba(3,6,5,.6);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.drawer{position:fixed;top:0;right:0;bottom:0;z-index:99;width:min(78vw,300px);background:var(--surface);border-left:1px solid var(--line-strong);padding:calc(var(--sp-4) + env(safe-area-inset-top,0px)) var(--sp-4) var(--sp-4);box-shadow:var(--sh-2);transform:translateX(100%);visibility:hidden;transition:transform var(--m-base) var(--e-out),visibility 0s linear var(--m-base)}
+.drawer.is-open{transform:none;visibility:visible;transition:transform var(--m-base) var(--e-out)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-5)}
+.drawer-title{font-size:var(--t-h3);font-weight:600}
+.drawer-close{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;background:var(--surface-2);color:var(--text-2);font-size:22px;line-height:1}
+.drawer-item{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:52px;padding:var(--sp-3);border-radius:var(--r-md);background:var(--bg-2);border:1px solid var(--line);color:var(--text);font-size:var(--t-body);font-weight:600;text-align:start;cursor:pointer}
+.drawer-item:active{background:var(--surface-2)}
+.drawer-item svg{width:20px;height:20px;color:#ff6b81;flex:0 0 auto}
+.drawer-item span{flex:1}
