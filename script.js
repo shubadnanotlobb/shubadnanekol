@@ -2958,6 +2958,7 @@ function renderHomeCategories() {
 /* Home shows what the user actually saved. Called whenever the restaurant
    data lands and whenever a heart is toggled, so the rail never lies. */
 function renderHomeSaved() {
+  renderSavedPage();
   const section = document.getElementById("homeCats");
   const rail = document.getElementById("homeSavedRail");
   const empty = document.getElementById("homeSavedEmpty");
