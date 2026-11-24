@@ -3705,33 +3705,9 @@ body.is-entering #pageHome .install {
 .drawer-item svg{width:20px;height:20px;color:#ff6b81;flex:0 0 auto}
 .drawer-item span{flex:1}
 header.appbar .appbar-inner{position:relative!important}
-header.appbar .appbar-menu{
-  position:absolute!important;
-  top:50%!important;
-  right:12px!important;
-  left:auto!important;
-  inset-inline-start:auto!important;
-  inset-inline-end:12px!important;
-  transform:translateY(-50%)!important;
-  width:48px!important;height:48px!important;
-  display:none;
-  align-items:center;justify-content:center;
-  z-index:5;
-}
+header.appbar .appbar-menu{position:absolute!important;top:50%!important;right:12px!important;left:auto!important;inset-inline-start:auto!important;inset-inline-end:12px!important;transform:translateY(-50%)!important;width:48px!important;height:48px!important;display:none;align-items:center;justify-content:center;z-index:5}
 header.appbar .appbar-menu svg{width:30px!important;height:30px!important}
 body.has-menu header.appbar .appbar-menu{display:flex!important}
-body.has-menu:not(.is-home) header.appbar .appbar-back{position:absolute!important;left:12px!important;right:auto!important;margin:0!important}
-.drawer{right:auto!important;left:0!important;border-left:0!important;border-right:1px solid var(--line-strong)!important;transform:translateX(-100%)!important;width:min(70vw,280px)!important}
-.drawer.is-open{transform:none!important}
 body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
-body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:auto!important;right:auto!important;margin-inline-start:-8px!important}
-
-header.appbar .appbar-menu{right:12px!important;left:auto!important}
-body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
-body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:auto!important;right:auto!important;margin-inline-start:-8px!important}
-
-header.appbar{z-index:100!important}
-.drawer-backdrop{top:0!important;z-index:98!important}
-.drawer{top:0!important;right:0!important;left:auto!important;border-right:0!important;border-left:1px solid var(--line-strong)!important;transform:translateX(100%)!important;width:min(70vw,280px)!important;z-index:99!important;padding-top:var(--sp-4)!important}
+.drawer{right:0!important;left:auto!important;border-left:1px solid var(--line-strong)!important;border-right:0!important;transform:translateX(100%)!important;width:min(70vw,280px)!important}
 .drawer.is-open{transform:none!important}
-.drawer-head{display:flex!important}
