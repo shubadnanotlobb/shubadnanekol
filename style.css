@@ -3712,3 +3712,29 @@ body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
 .drawer{right:0!important;left:auto!important;border-left:1px solid var(--line-strong)!important;border-right:0!important;transform:translateX(100%)!important;width:min(70vw,280px)!important}
 .drawer.is-open{transform:none!important}
 header.appbar .appbar-menu{left:auto!important;right:12px!important;inset-inline-start:12px!important;inset-inline-end:auto!important}
+.sx-card{position:relative;padding-top:var(--sp-5)}
+.sx-trash{position:absolute;top:8px;left:8px;width:32px;height:32px;display:none;place-items:center;border-radius:50%;background:var(--danger-dim);color:var(--danger);border:1px solid rgba(229,84,77,.3)}
+.sx-trash svg{width:16px;height:16px}
+.sx-trash:active{background:rgba(229,84,77,.28)}
+#pageStatsRest.sx-edit .sx-trash{display:grid}
+.sx-reset-all{display:none}
+#pageStatsRest.sx-edit .sx-reset-all{display:flex}
+.sx-actions{display:flex;gap:var(--sp-2);align-items:center}
+#pageStatsRest.sx-edit #sx-edit-btn{background:var(--accent);color:#fff}
+.sx-sub{font-size:var(--t-2xs);color:var(--text-3);margin-top:6px}
+.sx-sub b{color:var(--text-2);font-weight:600}
+.stats-summary.sx-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:600px){.stats-summary.sx-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.sx-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sx-table{min-width:330px}
+.sx-head,.sx-row{display:grid;grid-template-columns:minmax(78px,1.5fr) repeat(5,minmax(44px,1fr));gap:var(--sp-2);align-items:center;text-align:center}
+.sx-head{font-size:11px;color:var(--text-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.sx-row{width:100%;padding-block:var(--sp-3);border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:var(--t-sm);background:none;color:inherit}
+.sx-row:last-child{border-bottom:0}
+.sx-head span:first-child,.sx-row span:first-child{text-align:start}
+.sx-row .sx-name{font-weight:500}
+button.sx-row{cursor:pointer;font:inherit;border-inline:0;border-top:0}
+button.sx-row:active{background:var(--surface-2)}
+.sx-total{font-weight:700;border-top:1px solid var(--line-strong)}
+.sx-hint{font-size:var(--t-2xs);color:var(--text-3);margin-bottom:var(--sp-3)}
+.sx-date{width:auto;min-height:40px}
