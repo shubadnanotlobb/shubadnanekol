@@ -2070,14 +2070,22 @@ onAuthStateChanged(auth, (user) => {
 // ============================================================
 
 function filterCategories() {
+const grid =
+    document.getElementById(
+      "categoriesGridContainer"
+    );
+  if (!grid)
+    return;
 
+
+  grid.innerHTML = "";
+  
   const queryStr =
     document.getElementById(
       "categoriesSearchInput"
-    )?.value
+   )?.value
       .toLowerCase()
-      .trim();
-
+      .trim() || "";
 
   const grid =
     document.getElementById(
@@ -2089,7 +2097,9 @@ function filterCategories() {
     return;
 
 
-  grid.innerHTML = "";
+ grid.innerHTML = "";
+
+  renderRestaurantMatches(queryStr);
 
 
   const filtered =
@@ -5305,3 +5315,73 @@ window.openRestaurantStats = openRestaurantStats;
 window.loadRestaurantStats = loadRestaurantStats;
 window.renderStatsDay = renderStatsDay;
 window.resetRestaurantStats = resetRestaurantStats;
+// ============================================================
+// CATEGORIES PAGE: restaurants also appear in the category search
+// ============================================================
+
+function renderRestaurantMatches(rawQuery) {
+  const grid = document.getElementById("categoriesGridContainer");
+  if (!grid) return;
+
+  let box = document.getElementById("categoriesRestaurantResults");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "categoriesRestaurantResults";
+    box.className = "home-search-results";
+    grid.parentNode.insertBefore(box, grid);
+  }
+
+  const q = normSearch(rawQuery);
+  if (!q || !restaurantsLoaded) {
+    box.hidden = true;
+    box.innerHTML = "";
+    grid.classList.remove("is-hidden");
+    return;
+  }
+
+  const found = allRestaurants
+    .filter((r) => normSearch(r.name).includes(q))
+    .slice(0, 30);
+
+  if (!found.length) {
+    box.hidden = true;
+    box.innerHTML = "";
+    grid.classList.remove("is-hidden");
+    return;
+  }
+
+  box.hidden = false;
+  box.innerHTML =
+    '<div class="section-sub" style="margin-bottom:4px">مطاعم</div>' +
+    found.map((r) => {
+      const closed = isRestaurantClosed(r.openTime, r.closeTime);
+      const pic = r.logo || r.cover || "";
+      return (
+        '<button type="button" class="search-result" data-rest="' + escapeHtml(r.id) + '">' +
+          '<span class="search-result-img">' +
+            (pic ? '<img src="' + escapeHtml(pic) + '" alt="" loading="lazy">' : "") +
+          "</span>" +
+          '<span class="search-result-name">' + escapeHtml(r.name || "") + "</span>" +
+          '<span class="status ' + (closed ? "is-closed" : "is-open") + '"><i></i>' +
+            (closed ? "مغلق" : "مفتوح") + "</span>" +
+        "</button>"
+      );
+    }).join("");
+
+  box.onclick = (e) => {
+    const btn = e.target.closest(".search-result");
+    if (!btn) return;
+    const r = allRestaurants.find((x) => x.id === btn.dataset.rest);
+    if (r) openRestaurantProfile(r, e);
+  };
+}
+
+function normSearch(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .trim();
+}
