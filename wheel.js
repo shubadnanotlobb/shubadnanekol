@@ -435,27 +435,39 @@ function tick() {
 const winSnd = new Audio("win.mp3");
 winSnd.preload = "auto";
 
+/* iPhone only allows sound that starts from a tap. So on every SPIN tap we
+   start the clip silently (looping), and when the wheel stops we un-mute it
+   and play it from the start. It never has to "start" without a tap. */
 function unlockWin() {
   try {
+    winSnd.loop = true;
     winSnd.muted = true;
-    const p = winSnd.play();
-    const done = () => { winSnd.pause(); winSnd.currentTime = 0; winSnd.muted = false; };
-    if (p && p.then) p.then(done).catch(() => { winSnd.muted = false; });
-    else done();
-  } catch (e) {}
-}
-
-function playWin() {
-  if (muted) return;
-  try {
     winSnd.currentTime = 0;
     const p = winSnd.play();
     if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
+function playWin() {
+  try {
+    winSnd.loop = false;
+    winSnd.currentTime = 0;
+    if (muted) {
+      winSnd.pause();
+      return;
+    }
+    winSnd.muted = false;
+    const p = winSnd.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+}
+
 function stopWin() {
-  try { winSnd.pause(); } catch (e) {}
+  try {
+    winSnd.pause();
+    winSnd.loop = false;
+    winSnd.muted = false;
+  } catch (e) {}
 }
 
 /* ---------------- confetti / fireworks ---------------- */
