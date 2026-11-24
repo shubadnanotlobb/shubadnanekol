@@ -661,6 +661,10 @@ function showPage(pageId, isBack = false) {
 
   // Homepage-only atmosphere (blue gradient + centred app-bar brand line)
   document.body.classList.toggle("is-home", pageId === "pageHome");
+  document.body.classList.toggle(
+    "has-menu",
+    ["pageHome", "pageCategories", "pageRestaurants", "pageSaved"].indexOf(pageId) !== -1
+  );
 
   // Dynamic app-bar title — presentation only, with a short crossfade so the
   // bar reads as part of the transition instead of a hard text swap.
