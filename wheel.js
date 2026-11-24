@@ -413,8 +413,23 @@ function tone(freq, start, dur, type, vol) {
   o.stop(t + dur + 0.02);
 }
 
-function tick() { tone(900, 0, 0.05, "square", 0.06); }
-
+function tick() {
+  const a = audio();
+  if (!a || muted) return;
+  const t = a.currentTime;
+  const o = a.createOscillator();
+  const g = a.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(1400, t);
+  o.frequency.exponentialRampToValueAtTime(500, t + 0.04);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.12, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  o.connect(g);
+  g.connect(a.destination);
+  o.start(t);
+  o.stop(t + 0.08);
+}
 function winSound() {
   [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, "triangle", 0.18));
 }
