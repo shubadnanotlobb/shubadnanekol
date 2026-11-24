@@ -3729,3 +3729,9 @@ body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:au
 header.appbar .appbar-menu{right:12px!important;left:auto!important}
 body:not(.has-menu) header.appbar .appbar-menu{display:none!important}
 body:not(.has-menu) header.appbar .appbar-back{position:static!important;left:auto!important;right:auto!important;margin-inline-start:-8px!important}
+
+header.appbar{z-index:100!important}
+.drawer-backdrop{top:0!important;z-index:98!important}
+.drawer{top:0!important;right:0!important;left:auto!important;border-right:0!important;border-left:1px solid var(--line-strong)!important;transform:translateX(100%)!important;width:min(70vw,280px)!important;z-index:99!important;padding-top:var(--sp-4)!important}
+.drawer.is-open{transform:none!important}
+.drawer-head{display:flex!important}
