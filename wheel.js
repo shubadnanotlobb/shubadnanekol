@@ -448,15 +448,15 @@ const DEFAULT_SOUND = ""; /* no default: a category without a sound stays silent
    To add a category: add one new line, and don't forget the comma at the end.
    ===================================================================== */
 const SOUND_MAP_RAW = {
-  "Farooj": "win.mp3",
+  "Farooj": "chickenn.mp3",
   "Sushi": "sush.mp3",
   "Mashewe": "mashewe.mp3",
-   "Snack": "win.mp3",
+   "Snack": "chickenn.mp3",
    "Pizza": "pizza.mp3",
-   "sea food": "win.mp3",
-   "pasta": "win.mp3",
+   "sea food": "seafood.mp3",
+   "pasta": "pizza.mp3",
    "shawarma": "shawarma.mp3",
-   "dessert": "win.mp3",
+   "dessert": "dessert.mp3",
 };
 const SOUND_MAP = {};
 Object.keys(SOUND_MAP_RAW).forEach((k) => { SOUND_MAP[k.trim().toLowerCase()] = SOUND_MAP_RAW[k]; });
