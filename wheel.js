@@ -94,11 +94,11 @@ function mountModal() {
       "</div>" +
       '<div class="wl-result" id="wlResult" hidden>' +
         '<div class="wl-result-pic" id="wlPic"></div>' +
-        '<div class="wl-result-label">اليوم عبالك</div>' +
+        '<div class="wl-result-label">Nice Choice</div>' +
         '<div class="wl-result-name" id="wlName"></div>' +
         '<div class="wl-actions">' +
-          '<button type="button" class="wl-btn is-main" data-wl="go">شوف المطاعم</button>' +
-          '<button type="button" class="wl-btn" data-wl="again">لف تاني</button>' +
+          '<button type="button" class="wl-btn is-main" data-wl="go">Enter Category</button>' +
+          '<button type="button" class="wl-btn" data-wl="again">Spin Again</button>' +
         "</div>" +
       "</div>" +
     "</div>";
