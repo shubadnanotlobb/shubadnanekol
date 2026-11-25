@@ -449,13 +449,13 @@ const DEFAULT_SOUND = ""; /* no default: a category without a sound stays silent
    ===================================================================== */
 const SOUND_MAP_RAW = {
   "Farooj": "win.mp3",
-  "Sushi": "win.mp3",
-  "Mashewe": "win.mp3",
+  "Sushi": "sush.mp3",
+  "Mashewe": "mashewe.mp3",
    "Snack": "win.mp3",
-   "Pizza": "win.mp3",
+   "Pizza": "pizza.mp3",
    "sea food": "win.mp3",
    "pasta": "win.mp3",
-   "shawarma": "win.mp3",
+   "shawarma": "shawarma.mp3",
    "dessert": "win.mp3",
 };
 const SOUND_MAP = {};
