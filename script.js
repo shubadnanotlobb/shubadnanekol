@@ -186,7 +186,7 @@ function showConfirm(message, title = "تأكيد", confirmLabel = "تأكيد")
 }
 
 /* --- Gallery lightbox ------------------------------------------------- */
-l/* --- Gallery lightbox (swipe + tap, like a story) --- */
+/* --- Gallery lightbox (swipe + tap, like a story) --- */
 let lightboxImages = [];
 let lightboxIndex = 0;
 let lightboxObserver = null;
