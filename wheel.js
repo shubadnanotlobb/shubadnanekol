@@ -472,7 +472,7 @@ const SOUND_MAP_RAW = {
    "sea food": "seafood2.mp3",
    "pasta": "pizza.mp3",
    "shawarma": "shawarma.mp3",
-   "dessert": "dessert.mp3",
+   "dessert": "dessertt.mp3",
 };
 const SOUND_MAP = {};
 Object.keys(SOUND_MAP_RAW).forEach((k) => { SOUND_MAP[k.trim().toLowerCase()] = SOUND_MAP_RAW[k]; });
