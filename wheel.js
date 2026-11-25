@@ -66,7 +66,7 @@ function mountEntry() {
   btn.className = "wl-entry";
   btn.innerHTML =
     '<span class="wl-entry-ico">🎡</span>' +
-    '<span class="wl-entry-txt"><b>دولاب الحظ</b><small>مش عارف شو تاكل؟ لف الدولاب</small></span>' +
+    '<span class="wl-entry-txt"><b>Meal & Wheel</b><small>مش عارف شو تاكل؟ لف الدولاب</small></span>' +
     '<span class="wl-entry-go">‹</span>';
   btn.addEventListener("click", openWheel);
   grid.parentNode.insertBefore(btn, grid);
