@@ -86,7 +86,7 @@ function mountModal() {
       '<button type="button" class="wl-close" data-wl="close" aria-label="إغلاق">×</button>' +
       '<button type="button" class="wl-mute" id="wlMute" data-wl="mute" aria-label="الصوت">🔊</button>' +
       '<h2 class="wl-title">دولاب الحظ</h2>' +
-      '<p class="wl-sub" id="wlSub">لف الدولاب وشوف شو رح تاكل اليوم</p>' +
+      '<p class="wl-sub" id="wlSub">SPIN NOW</p>' +
       '<div class="wl-stage">' +
         '<div class="wl-pointer"></div>' +
         '<canvas id="wlCanvas"></canvas>' +
