@@ -186,32 +186,51 @@ function showConfirm(message, title = "تأكيد", confirmLabel = "تأكيد")
 }
 
 /* --- Gallery lightbox ------------------------------------------------- */
+l/* --- Gallery lightbox (swipe + tap, like a story) --- */
 let lightboxImages = [];
 let lightboxIndex = 0;
+let lightboxObserver = null;
 
 function openLightbox(list, index) {
   const box = document.getElementById("lightbox");
-  if (!box || !list || list.length === 0) return;
-  lightboxImages = list;
+  const track = document.getElementById("lightboxTrack");
+  if (!box || !track || !list || !list.length) return;
+  lightboxImages = list.slice();
   lightboxIndex = Math.min(Math.max(index || 0, 0), list.length - 1);
-  renderLightbox();
+
+  track.innerHTML = lightboxImages.map((src, i) =>
+    '<div class="lightbox-slide" data-i="' + i + '"><img src="' + escapeHtml(src) + '" alt=""' +
+    (Math.abs(i - lightboxIndex) > 1 ? ' loading="lazy"' : "") +
+    ' decoding="async" draggable="false"></div>').join("");
+
+  const bars = document.getElementById("lightboxBars");
+  if (bars) bars.innerHTML = list.length > 1 ? list.map(() => "<span></span>").join("") : "";
+
   box.hidden = false;
   document.body.classList.add("no-scroll");
+  const start = track.children[lightboxIndex];
+  if (start) start.scrollIntoView({ block: "nearest", inline: "center", behavior: "instant" });
+
+  if (lightboxObserver) lightboxObserver.disconnect();
+  lightboxObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { lightboxIndex = Number(e.target.dataset.i); renderLightbox(); }
+    });
+  }, { root: track, threshold: 0.6 });
+  Array.from(track.children).forEach(s => lightboxObserver.observe(s));
+  renderLightbox();
 }
 
 function renderLightbox() {
-  const img = document.getElementById("lightboxImg");
-  const count = document.getElementById("lightboxCount");
-  const prev = document.getElementById("lightboxPrev");
-  const next = document.getElementById("lightboxNext");
   const total = lightboxImages.length;
-
-  if (img) img.src = lightboxImages[lightboxIndex] || "";
+  const count = document.getElementById("lightboxCount");
   if (count) count.textContent = (lightboxIndex + 1) + " / " + total;
-
-  const multi = total > 1;
-  if (prev) prev.hidden = !multi;
-  if (next) next.hidden = !multi;
+  const bars = document.getElementById("lightboxBars");
+  if (bars) Array.from(bars.children).forEach((b, i) => b.classList.toggle("is-seen", i <= lightboxIndex));
+  ["lightboxPrev", "lightboxNext"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = total < 2;
+  });
 }
 
 function closeLightbox() {
@@ -219,15 +238,21 @@ function closeLightbox() {
   if (!box) return;
   box.hidden = true;
   document.body.classList.remove("no-scroll");
+  if (lightboxObserver) { lightboxObserver.disconnect(); lightboxObserver = null; }
+  const track = document.getElementById("lightboxTrack");
+  if (track) track.innerHTML = "";
 }
 
 function stepLightbox(delta) {
-  if (lightboxImages.length === 0) return;
-  lightboxIndex =
-    (lightboxIndex + delta + lightboxImages.length) % lightboxImages.length;
+  const total = lightboxImages.length;
+  if (total < 2) return;
+  const target = (lightboxIndex + delta + total) % total;
+  const slide = document.getElementById("lightboxTrack")?.children[target];
+  if (!slide) return;
+  slide.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  lightboxIndex = target;
   renderLightbox();
 }
-
 /* --- List states (skeleton / empty) ----------------------------------- */
 /* One monoline food mark for every empty state: cutlery, never a cartoon. */
 const EMPTY_MARK_SVG =
@@ -5345,7 +5370,15 @@ function initDesignSystem() {
 
   if (lightbox) {
     lightbox.addEventListener("click", event => {
-      if (event.target === lightbox) closeLightbox();
+           const t = event.target;
+      if (t && t.tagName === "IMG" && t.closest(".lightbox-slide")) {
+        const r = t.getBoundingClientRect();
+        const x = (event.clientX - r.left) / (r.width || 1);
+        if (x < 0.35) stepLightbox(1);
+        else if (x > 0.65) stepLightbox(-1);
+        return;
+      }
+      if (t === lightbox || (t && t.classList && t.classList.contains("lightbox-slide"))) closeLightbox();
     });
   }
 
