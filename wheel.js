@@ -94,11 +94,11 @@ function mountModal() {
       "</div>" +
       '<div class="wl-result" id="wlResult" hidden>' +
         '<div class="wl-result-pic" id="wlPic"></div>' +
-        '<div class="wl-result-label"Nice Choice</div>' +
+        '<div class="wl-result-label">اليوم عبالك</div>' +
         '<div class="wl-result-name" id="wlName"></div>' +
         '<div class="wl-actions">' +
-          '<button type="button" class="wl-btn is-main" data-wl="go">ENTER</button>' +
-          '<button type="button" class="wl-btn" data-wl="again">SPIN AGAIN</button>' +
+          '<button type="button" class="wl-btn is-main" data-wl="go">شوف المطاعم</button>' +
+          '<button type="button" class="wl-btn" data-wl="again">لف تاني</button>' +
         "</div>" +
       "</div>" +
     "</div>";
@@ -439,6 +439,21 @@ function tick() {
    If the category's own file can't be read, the default win.mp3 plays. */
 
 const DEFAULT_SOUND = ""; /* no default: a category without a sound stays silent */
+
+/* =====================================================================
+   SOUNDS PER CATEGORY  (edit here)
+   Left side  = the category name exactly as it shows on the wheel
+                (capital letters don't matter).
+   Right side = the mp3 file name you uploaded to GitHub (same folder as index.html).
+   To add a category: add one new line, and don't forget the comma at the end.
+   ===================================================================== */
+const SOUND_MAP_RAW = {
+  "Farooj": "farooj.mp3",
+  "Sushi": "sushi.mp3",
+  "Mashewe": "mashewe.mp3",
+};
+const SOUND_MAP = {};
+Object.keys(SOUND_MAP_RAW).forEach((k) => { SOUND_MAP[k.trim().toLowerCase()] = SOUND_MAP_RAW[k]; });
 const bufCache = {};
 let curBufP = null;
 let winNode = null;
@@ -466,10 +481,16 @@ function dbg(msg) {
 }
 
 function soundFor(item) {
-  const s = String((item && item.sound) || "").trim();
-  if (!s) return "";
-  if (/^(https?:\/\/|data:)/i.test(s)) return s;
-  return s.replace(/^\/+/, "");
+  const raw = (item && item.raw) || {};
+  const names = [item && item.name, raw.nameAr, raw.nameEn, item && item.id]
+    .map((x) => String(x || "").trim().toLowerCase())
+    .filter(Boolean);
+  let file = "";
+  for (const n of names) {
+    if (SOUND_MAP[n]) { file = SOUND_MAP[n]; break; }
+  }
+  dbg("category: " + (names[0] || "?") + " -> " + (file || "no sound"));
+  return String(file || "").trim().replace(/^\/+/, "");
 }
 
 function fullUrl(src) {
