@@ -453,7 +453,7 @@ const SOUND_MAP_RAW = {
   "Mashewe": "mashewe.mp3",
    "Snack": "chickenn.mp3",
    "Pizza": "pizza.mp3",
-   "sea food": "seafood.mp3",
+   "sea food": "seafood2.mp3",
    "pasta": "pizza.mp3",
    "shawarma": "shawarma.mp3",
    "dessert": "dessert.mp3",
