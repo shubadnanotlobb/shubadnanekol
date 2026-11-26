@@ -5151,74 +5151,86 @@ function isPwaInstalled() {
 function hidePwaInstallButtons(persist) {
   if (typeof window.hidePwaInstallButtons === "function") window.hidePwaInstallButtons(persist);
 }
+function waitForInstallPrompt(ms) {
+  if (window.deferredPrompt) return Promise.resolve(window.deferredPrompt);
+  return new Promise(resolve => {
+    let timer = null;
+    const done = () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      resolve(window.deferredPrompt || null);
+    };
+    const onPrompt = () => setTimeout(done, 0);
+    timer = setTimeout(done, ms);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+  });
+}
 
-window.triggerInstallModal = function() {
-  // لا تعرض أي شيء داخل التطبيق المثبت
+let installWaiting = false;
+
+window.triggerInstallModal = async function() {
   if (isStandaloneMode()) {
     hidePwaInstallButtons(true);
     return;
   }
+  if (installWaiting) return;
+
+  if (!window.deferredPrompt) {
+    installWaiting = true;
+    showToast('لحظة، عم نجهّز التثبيت…', 'info', 2500);
+    await waitForInstallPrompt(4000);
+    installWaiting = false;
+  }
+
   const modal = document.getElementById('pwaModal');
-  // إذا توفر Chrome prompt نعرض نافذة التأكيد أولاً
-  if (window.deferredPrompt && modal) {
-    modal.style.display = 'flex';
-    return;
-  }
-  // إذا توفر prompt بدون modal (حالة نادرة) نفّذه مباشرة
   if (window.deferredPrompt) {
-    promptAndroidInstall();
+    if (modal) modal.style.display = 'flex';
+    else promptAndroidInstall();
     return;
   }
-  // لا يوجد prompt: التطبيق مثبت أو المتصفح لا يدعم — إرشاد يدوي
-  alert('للتثبيت يدوياً من Chrome: اضغط ⋮ ثم "Add to Home screen" أو "Install app".');
+
+  showToast('للتثبيت: اضغط ⋮ فوق بـ Chrome، وبعدين "Install app" أو "Add to Home screen".', 'info', 7000);
 };
 
 let installPromptBusy = false;
 
 async function promptAndroidInstall() {
   const modal = document.getElementById('pwaModal');
-
   if (installPromptBusy) return;
 
   const promptEvent = window.deferredPrompt;
   if (!promptEvent) {
-    alert('ميزة التثبيت غير متاحة حالياً أو أن التطبيق مثبت مسبقاً على هاتفك. يمكنك تثبيته يدوياً من إعدادات المتصفح (إضافة إلى الشاشة الرئيسية).');
     if (modal) modal.style.display = 'none';
+    showToast('للتثبيت: اضغط ⋮ فوق بـ Chrome، وبعدين "Install app" أو "Add to Home screen".', 'info', 7000);
     return;
   }
 
   installPromptBusy = true;
   window.deferredPrompt = null;
   if (modal) modal.style.display = 'none';
+  const unlock = setTimeout(() => { installPromptBusy = false; }, 15000);
 
   try {
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
-    if (outcome === 'accepted') {
-      console.log('User accepted the install prompt');
-      hidePwaInstallButtons(true);
-    }
+    if (outcome === 'accepted') hidePwaInstallButtons(true);
   } catch (err) {
     console.error('Install prompt failed:', err);
   } finally {
+    clearTimeout(unlock);
     installPromptBusy = false;
   }
 }
 window.promptAndroidInstall = promptAndroidInstall;
 
+if (window.__wantInstall) {
+  window.__wantInstall = false;
+  window.triggerInstallModal();
+}
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
-  // إخفاء بلوك التثبيت كاملاً إذا فُتح الموقع كتطبيق مثبّت
-  // أو إذا كان التثبيت مسجّلاً مسبقاً من زيارة سابقة
-  if (isStandaloneMode()) {
-    hidePwaInstallButtons(true);
-    return;
-  }
-  if (isPwaInstalled()) {
-    hidePwaInstallButtons(false);
-    return;
-  }
-
   const installBtn = document.getElementById('pwaInstallBtn');
   const closeBtn = document.getElementById('pwaCloseBtn');
   const modal = document.getElementById('pwaModal');
@@ -5233,14 +5245,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // إغلاق النافذة عند الضغط خارجها
   if (modal) {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.style.display = 'none';
     });
   }
-});
 
+  if (isStandaloneMode()) {
+    hidePwaInstallButtons(true);
+    return;
+  }
+  if (isPwaInstalled()) {
+    hidePwaInstallButtons(false);
+  }
+});
 
 // ============================================================
 // GLOBAL FUNCTIONS EXPORT
