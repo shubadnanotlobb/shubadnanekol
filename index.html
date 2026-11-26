@@ -68,7 +68,7 @@
   window.isStandaloneMode = isStandaloneMode;
   window.hidePwaInstallButtons = hidePwaInstallButtons;
   window.showPwaInstallSection = showPwaInstallSection;
-
+  window.triggerInstallModal = function () { window.__wantInstall = true; };
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     window.deferredPrompt = e;
